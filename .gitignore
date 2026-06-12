@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Umgebungsvariablen – NIEMALS in Git einchecken!
+.env
+.env.local
+.env.*.local
+.env.production
