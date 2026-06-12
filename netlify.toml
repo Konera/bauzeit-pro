@@ -1,0 +1,48 @@
+# Netlify Deployment-Konfiguration für BauZeit Pro PWA
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+# Umgebungsvariablen für den Build-Prozess
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA-Routing: Alle Routen auf index.html umleiten
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Security Headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(self), notifications=(self), vibrate=(self)"
+
+# Cache für statische Assets (JS/CSS mit Hash im Namen)
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Service Worker – kein Cache (immer aktuell prüfen)
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/workbox-*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Manifest – kurzer Cache
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+    Content-Type = "application/manifest+json"
