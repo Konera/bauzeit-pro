@@ -1,5 +1,5 @@
 // Zeitberechnungs-Hilfsfunktionen für BauZeit Pro
-import { format, formatDistance, differenceInMinutes, differenceInSeconds, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays } from 'date-fns'
+import { format, formatDistance, differenceInMinutes, differenceInSeconds, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay, addDays } from 'date-fns'
 import { de } from 'date-fns/locale'
 
 // =========================================
@@ -121,9 +121,11 @@ export function calculateTotalPauseMinutes(
 
 /**
  * Prüft ob Arbeitszeit die Grenze überschreitet
+ * H7 FIX: Pausenminuten werden jetzt abgezogen
  */
-export function isOverTimeLimit(startTime: string, limitHours: number): boolean {
-  const workedMinutes = differenceInMinutes(new Date(), parseISO(startTime))
+export function isOverTimeLimit(startTime: string, limitHours: number, pauseMinutes: number = 0): boolean {
+  const elapsedMinutes = differenceInMinutes(new Date(), parseISO(startTime))
+  const workedMinutes = elapsedMinutes - pauseMinutes
   return workedMinutes > limitHours * 60
 }
 
@@ -132,10 +134,11 @@ export function isOverTimeLimit(startTime: string, limitHours: number): boolean 
 // =========================================
 
 export function getTodayRange(): { from: string; to: string } {
+  // K9 FIX: Timezone-korrekte Tagesgrenzen (UTC+1/+2 für DE)
   const today = new Date()
   return {
-    from: format(today, 'yyyy-MM-dd') + 'T00:00:00',
-    to: format(today, 'yyyy-MM-dd') + 'T23:59:59',
+    from: startOfDay(today).toISOString(),
+    to: endOfDay(today).toISOString(),
   }
 }
 
@@ -143,8 +146,8 @@ export function getWeekRange(date: Date = new Date()): { from: string; to: strin
   const start = startOfWeek(date, { weekStartsOn: 1 }) // Montag
   const end = endOfWeek(date, { weekStartsOn: 1 })
   return {
-    from: format(start, 'yyyy-MM-dd') + 'T00:00:00',
-    to: format(end, 'yyyy-MM-dd') + 'T23:59:59',
+    from: startOfDay(start).toISOString(),
+    to: endOfDay(end).toISOString(),
   }
 }
 
@@ -152,8 +155,8 @@ export function getMonthRange(date: Date = new Date()): { from: string; to: stri
   const start = startOfMonth(date)
   const end = endOfMonth(date)
   return {
-    from: format(start, 'yyyy-MM-dd') + 'T00:00:00',
-    to: format(end, 'yyyy-MM-dd') + 'T23:59:59',
+    from: startOfDay(start).toISOString(),
+    to: endOfDay(end).toISOString(),
   }
 }
 

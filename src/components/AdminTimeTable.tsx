@@ -1,6 +1,7 @@
 // AdminTimeTable: Stundenzettel-Tabelle für Admin
+// Phase 2: GPS-Warnung, Reject-Button, Genehmigungs-Info
 import React, { useState } from 'react'
-import { Edit2, Check, ChevronDown, ChevronUp, MapPin, Clock } from 'lucide-react'
+import { Edit2, Check, ChevronDown, ChevronUp, MapPin, Clock, XCircle, AlertTriangle, Navigation } from 'lucide-react'
 import { TimeEntryStatusBadge } from './StatusBadge'
 import type { TimeEntry } from '../types/database'
 import { formatDateTime, formatMinutes, formatDate } from '../utils/timeUtils'
@@ -10,6 +11,7 @@ interface AdminTimeTableProps {
   entries: TimeEntry[]
   onApprove?: (id: string) => void
   onCorrect?: (entry: TimeEntry) => void
+  onReject?: (entry: TimeEntry) => void
   loading?: boolean
 }
 
@@ -17,6 +19,7 @@ export function AdminTimeTable({
   entries,
   onApprove,
   onCorrect,
+  onReject,
   loading = false,
 }: AdminTimeTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -61,7 +64,7 @@ export function AdminTimeTable({
   return (
     <div className="space-y-2">
       {/* Desktop Tabellen-Header */}
-      <div className="hidden md:grid grid-cols-6 gap-4 px-4 py-2 text-xs text-slate-500 font-medium uppercase tracking-wider">
+      <div className="hidden md:grid grid-cols-7 gap-4 px-4 py-2 text-xs text-slate-500 font-medium uppercase tracking-wider">
         <button
           onClick={() => toggleSort('start_time')}
           className="flex items-center gap-1 hover:text-slate-300 text-left"
@@ -76,16 +79,24 @@ export function AdminTimeTable({
         >
           Stunden {sortKey === 'total_minutes' && (sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
         </button>
+        <span>GPS</span>
         <span>Status</span>
         <span>Aktionen</span>
       </div>
 
       {/* Einträge */}
       {sorted.map(entry => (
-        <div key={entry.id} className="card hover:border-slate-600 transition-colors">
+        <div
+          key={entry.id}
+          className={clsx(
+            'card hover:border-slate-600 transition-colors',
+            entry.gps_warning && 'border-l-2 border-l-paused',
+            entry.status === 'rejected' && 'border-l-2 border-l-stopped'
+          )}
+        >
           {/* Hauptzeile */}
           <div
-            className="grid md:grid-cols-6 gap-3 md:gap-4 cursor-pointer md:cursor-default"
+            className="grid md:grid-cols-7 gap-3 md:gap-4 cursor-pointer md:cursor-default"
             onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
           >
             {/* Datum + Zeiten */}
@@ -126,6 +137,23 @@ export function AdminTimeTable({
               <p className="text-xs text-slate-500">{entry.pause_minutes} min Pause</p>
             </div>
 
+            {/* GPS-Status */}
+            <div className="flex items-center">
+              {entry.gps_warning ? (
+                <span className="badge badge-gps-warning text-xs px-2 py-0.5" title={`Entfernung: ${entry.start_distance_m || '?'}m`}>
+                  <AlertTriangle size={10} className="mr-1" />
+                  ⚠️
+                </span>
+              ) : entry.start_lat ? (
+                <span className="badge badge-gps-ok text-xs px-2 py-0.5" title={`Entfernung: ${entry.start_distance_m || 0}m`}>
+                  <Navigation size={10} className="mr-1" />
+                  ✅
+                </span>
+              ) : (
+                <span className="text-xs text-slate-600">—</span>
+              )}
+            </div>
+
             {/* Status */}
             <div className="flex items-center">
               <TimeEntryStatusBadge status={entry.status} />
@@ -133,13 +161,22 @@ export function AdminTimeTable({
 
             {/* Aktionen */}
             <div className="flex items-center gap-2">
-              {entry.status !== 'approved' && onApprove && (
+              {entry.status !== 'approved' && entry.status !== 'rejected' && onApprove && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onApprove(entry.id) }}
                   className="p-2 bg-working/20 hover:bg-working/40 text-working rounded-lg transition-colors"
                   title="Genehmigen"
                 >
                   <Check size={14} />
+                </button>
+              )}
+              {entry.status !== 'approved' && entry.status !== 'rejected' && onReject && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onReject(entry) }}
+                  className="p-2 bg-stopped/20 hover:bg-stopped/40 text-stopped rounded-lg transition-colors"
+                  title="Ablehnen"
+                >
+                  <XCircle size={14} />
                 </button>
               )}
               {onCorrect && (
@@ -157,22 +194,56 @@ export function AdminTimeTable({
           {/* Erweiterte Details */}
           {expandedId === entry.id && (
             <div className="mt-3 pt-3 border-t border-slate-700 space-y-2 text-sm">
+              {/* Admin-Kommentar */}
               {entry.admin_comment && (
                 <div className="bg-slate-900 rounded-xl p-3">
                   <p className="text-xs text-slate-400 mb-1">Admin-Kommentar:</p>
                   <p className="text-slate-300">{entry.admin_comment}</p>
                 </div>
               )}
+
+              {/* Ablehnungsgrund */}
+              {entry.rejected_reason && (
+                <div className="bg-stopped/10 rounded-xl p-3 border border-stopped/20">
+                  <p className="text-xs text-stopped mb-1">❌ Ablehnungsgrund:</p>
+                  <p className="text-slate-300">{entry.rejected_reason}</p>
+                </div>
+              )}
+
+              {/* Genehmigungs-Info */}
+              {entry.approved_by_profile && entry.approved_at && (
+                <div className="bg-working/10 rounded-xl p-3 border border-working/20">
+                  <p className="text-xs text-working mb-1">
+                    ✅ {entry.status === 'rejected' ? 'Abgelehnt' : 'Genehmigt'} von {entry.approved_by_profile.full_name}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    am {formatDateTime(entry.approved_at)}
+                  </p>
+                </div>
+              )}
+
+              {/* GPS-Daten */}
               {(entry.start_lat || entry.end_lat) && (
-                <div className="flex gap-4 text-xs text-slate-500">
+                <div className="flex flex-wrap gap-4 text-xs text-slate-500">
                   {entry.start_lat && (
-                    <span>📍 Start: {entry.start_lat.toFixed(4)}, {entry.start_lng?.toFixed(4)}</span>
+                    <span>
+                      📍 Start: {entry.start_lat.toFixed(4)}, {entry.start_lng?.toFixed(4)}
+                      {entry.start_distance_m != null && ` (${entry.start_distance_m}m)`}
+                    </span>
                   )}
                   {entry.end_lat && (
-                    <span>📍 Ende: {entry.end_lat.toFixed(4)}, {entry.end_lng?.toFixed(4)}</span>
+                    <span>
+                      📍 Ende: {entry.end_lat.toFixed(4)}, {entry.end_lng?.toFixed(4)}
+                      {entry.end_distance_m != null && ` (${entry.end_distance_m}m)`}
+                    </span>
+                  )}
+                  {entry.gps_warning && (
+                    <span className="text-paused font-medium">⚠️ GPS-Warnung: Außerhalb des Baustellen-Radius</span>
                   )}
                 </div>
               )}
+
+              {/* Pausen */}
               {entry.breaks && entry.breaks.length > 0 && (
                 <div>
                   <p className="text-xs text-slate-400 mb-1">Pausen:</p>

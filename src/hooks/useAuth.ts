@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { Profile, AppUser } from '../types/database'
+import { useTranslation } from '../i18n/LanguageContext'
 
 interface AuthState {
   user: AppUser | null
@@ -11,6 +12,8 @@ interface AuthState {
 }
 
 export function useAuth() {
+  const { t } = useTranslation()
+
   const [state, setState] = useState<AuthState>({
     user: null,
     loading: true,
@@ -28,6 +31,15 @@ export function useAuth() {
 
       if (error) {
         console.error('Profil laden fehlgeschlagen:', error)
+        setState(prev => ({ ...prev, error: t('error_profile_load_failed') }))
+        return null
+      }
+
+      // K7 FIX: Deaktivierte Mitarbeiter blocken
+      if (!(profile as Profile).active) {
+        console.warn('Zugang verweigert: Mitarbeiter deaktiviert', authUser.id)
+        await supabase.auth.signOut()
+        setState(prev => ({ ...prev, error: t('error_account_deactivated') }))
         return null
       }
 
@@ -40,7 +52,7 @@ export function useAuth() {
       console.error('Unerwarteter Fehler beim Laden des Profils:', err)
       return null
     }
-  }, [])
+  }, [t])
 
   // Auth-State Listener
   useEffect(() => {
@@ -83,10 +95,11 @@ export function useAuth() {
     })
 
     if (error) {
+      // Fehlermeldungen über i18n übersetzen
       const errorMessages: Record<string, string> = {
-        'Invalid login credentials': 'E-Mail oder Passwort falsch',
-        'Email not confirmed': 'E-Mail nicht bestätigt',
-        'Too many requests': 'Zu viele Versuche. Bitte warten.',
+        'Invalid login credentials': t('error_invalid_credentials'),
+        'Email not confirmed': t('error_email_not_confirmed'),
+        'Too many requests': t('error_too_many_attempts'),
       }
       setState(prev => ({
         ...prev,
@@ -103,7 +116,7 @@ export function useAuth() {
     }
 
     return false
-  }, [loadProfile])
+  }, [loadProfile, t])
 
   // Logout-Funktion
   const logout = useCallback(async () => {

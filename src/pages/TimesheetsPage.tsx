@@ -1,5 +1,6 @@
 // Stundenzettel-Seite: Tages-, Wochen- und Monatsansicht
 import React, { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from '../i18n/LanguageContext'
 import {
   Calendar, ChevronLeft, ChevronRight, Clock, ArrowLeft,
   TrendingUp, Coffee, CheckCircle2
@@ -22,6 +23,7 @@ type ViewMode = 'day' | 'week' | 'month'
 
 export function TimesheetsPage() {
   const { user, isAdmin, isAdminOrManager } = useAuth()
+  const { t } = useTranslation()
   const [viewMode, setViewMode] = useState<ViewMode>('week')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [entries, setEntries] = useState<TimeEntry[]>([])
@@ -81,7 +83,7 @@ export function TimesheetsPage() {
       })
       setEntries(data || [])
     } catch (error) {
-      console.error('Zeiteinträge laden fehlgeschlagen:', error)
+      console.error(t('error_load_data'), error)
     } finally {
       setLoading(false)
     }
@@ -129,7 +131,7 @@ export function TimesheetsPage() {
             <ArrowLeft size={20} />
           </Link>
           <div className="flex-1">
-            <h1 className="text-lg font-bold text-white">Stundenzettel</h1>
+            <h1 className="text-lg font-bold text-white">{t('ts_title')}</h1>
             <p className="text-xs text-slate-500">
               {isAdminOrManager ? 'Alle Mitarbeiter' : user?.profile.full_name}
             </p>
@@ -151,7 +153,7 @@ export function TimesheetsPage() {
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              {mode === 'day' ? 'Tag' : mode === 'week' ? 'Woche' : 'Monat'}
+              {mode === 'day' ? t('ts_day') : mode === 'week' ? t('ts_week') : t('ts_month')}
             </button>
           ))}
         </div>
@@ -171,7 +173,7 @@ export function TimesheetsPage() {
               onClick={navigateToToday}
               className="text-xs text-construction-400 hover:text-construction-300 mt-0.5 transition-colors"
             >
-              Heute
+              {t('admin_today')}
             </button>
           </div>
 
@@ -187,10 +189,10 @@ export function TimesheetsPage() {
         {!loading && entries.length > 0 && (
           <div className="grid grid-cols-4 gap-2">
             {[
-              { label: 'Stunden', value: `${formatMinutes(totalWorkedMinutes)}h`, icon: TrendingUp, color: 'text-working' },
-              { label: 'Pause', value: `${totalPauseMinutes}min`, icon: Coffee, color: 'text-paused' },
-              { label: 'Genehmigt', value: approvedCount, icon: CheckCircle2, color: 'text-working' },
-              { label: 'Offen', value: pendingCount, icon: Clock, color: 'text-slate-400' },
+              { label: t('emp_hours'), value: `${formatMinutes(totalWorkedMinutes)}h`, icon: TrendingUp, color: 'text-working' },
+              { label: t('emp_pause'), value: `${totalPauseMinutes}min`, icon: Coffee, color: 'text-paused' },
+              { label: t('entry_approved'), value: approvedCount, icon: CheckCircle2, color: 'text-working' },
+              { label: t('entry_open'), value: pendingCount, icon: Clock, color: 'text-slate-400' },
             ].map(stat => (
               <div key={stat.label} className="card bg-slate-800/50 border-slate-700 p-3 text-center">
                 <stat.icon size={16} className={clsx('mx-auto mb-1', stat.color)} />
@@ -209,7 +211,7 @@ export function TimesheetsPage() {
         ) : entries.length === 0 ? (
           <div className="card text-center py-16">
             <Calendar size={48} className="mx-auto text-slate-700 mb-3" />
-            <p className="text-slate-400 font-medium">Keine Einträge</p>
+            <p className="text-slate-400 font-medium">{t('ts_no_entries')}</p>
             <p className="text-slate-500 text-sm mt-1">In diesem Zeitraum wurden keine Stunden erfasst</p>
           </div>
         ) : (
@@ -248,11 +250,11 @@ export function TimesheetsPage() {
                       'text-sm font-medium',
                       entry.end_time ? 'text-white' : 'text-paused'
                     )}>
-                      {entry.end_time ? formatTime(entry.end_time) : 'Aktiv'}
+                      {entry.end_time ? formatTime(entry.end_time) : t('admin_active')}
                     </p>
                   </div>
                   <div className="text-center">
-                    <p className="text-xs text-slate-500 mb-1">Gesamt</p>
+                    <p className="text-xs text-slate-500 mb-1">{t('ts_total_hours')}</p>
                     <p className={clsx(
                       'text-sm font-bold',
                       entry.total_minutes > 480 ? 'text-stopped' : 'text-working'
@@ -265,7 +267,7 @@ export function TimesheetsPage() {
                 {/* Pause */}
                 {entry.pause_minutes > 0 && (
                   <p className="text-xs text-slate-500 mt-2 text-center">
-                    ⏸️ {entry.pause_minutes} min Pause
+                    ⏸️ {entry.pause_minutes} min {t('emp_pause')}
                   </p>
                 )}
 
@@ -274,6 +276,24 @@ export function TimesheetsPage() {
                   <div className="mt-3 pt-3 border-t border-slate-700">
                     <p className="text-xs text-slate-400">
                       💬 <span className="text-slate-300">{entry.admin_comment}</span>
+                    </p>
+                  </div>
+                )}
+
+                {/* Phase 2: Ablehnungsgrund */}
+                {entry.rejected_reason && (
+                  <div className="mt-3 pt-3 border-t border-slate-700">
+                    <p className="text-xs text-stopped">
+                      ❌ <span className="text-slate-300">{entry.rejected_reason}</span>
+                    </p>
+                  </div>
+                )}
+
+                {/* Phase 2: Genehmigungs-Info */}
+                {entry.approved_by_profile && entry.approved_at && (
+                  <div className="mt-2">
+                    <p className="text-xs text-slate-500">
+                      {entry.status === 'rejected' ? `❌ ${t('entry_rejected')}` : `✅ ${t('entry_approved')}`} von {entry.approved_by_profile.full_name} am {formatDateTime(entry.approved_at)}
                     </p>
                   </div>
                 )}

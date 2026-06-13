@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { Capacitor } from '@capacitor/core'
 
 // Umgebungsvariablen aus .env
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
@@ -13,6 +14,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
   )
 }
 
+// Native App: detectSessionInUrl deaktivieren (kein URL-Redirect im WebView)
+const isNative = Capacitor.isNativePlatform()
+
 // Supabase-Client ohne generische DB-Typen (vermeidet TypeScript-Konflikte)
 // Typen werden manuell über die database.ts Typen durchgesetzt
 export const supabase = createClient(
@@ -22,7 +26,10 @@ export const supabase = createClient(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true,
+      // Im nativen WebView gibt es keine URL-Redirects für Auth
+      detectSessionInUrl: !isNative,
+      // Native: pkce Flow vermeiden (kein Browser-Redirect)
+      ...(isNative && { flowType: 'implicit' as const }),
     },
     realtime: {
       params: { eventsPerSecond: 10 },

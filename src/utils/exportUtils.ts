@@ -1,7 +1,5 @@
 // Export-Hilfsfunktionen: PDF und CSV für Stundenzettel
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
-import Papa from 'papaparse'
+// jsPDF, jspdf-autotable und papaparse werden dynamisch importiert (Code-Splitting)
 import type { TimeEntry, ExportOptions } from '../types/database'
 import { formatDateTime, formatMinutes, formatDate } from './timeUtils'
 
@@ -12,10 +10,14 @@ import { formatDateTime, formatMinutes, formatDate } from './timeUtils'
 /**
  * Exportiert Stundenzettel als PDF
  */
-export function exportToPDF(
+export async function exportToPDF(
   entries: TimeEntry[],
   options: Partial<ExportOptions> & { companyName?: string }
-): void {
+): Promise<void> {
+  // Dynamischer Import für Code-Splitting
+  const { default: jsPDF } = await import('jspdf')
+  const { default: autoTable } = await import('jspdf-autotable')
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -145,7 +147,10 @@ export function exportToPDF(
 /**
  * Exportiert Stundenzettel als CSV
  */
-export function exportToCSV(entries: TimeEntry[]): void {
+export async function exportToCSV(entries: TimeEntry[]): Promise<void> {
+  // Dynamischer Import für Code-Splitting
+  const { default: Papa } = await import('papaparse')
+
   const csvData = entries.map(entry => ({
     Mitarbeiter: entry.employee?.full_name || '',
     Baustelle: entry.site?.name || '',
@@ -192,6 +197,7 @@ function translateStatus(status: string): string {
     submitted: 'Eingereicht',
     approved: 'Genehmigt',
     corrected: 'Korrigiert',
+    rejected: 'Abgelehnt',
   }
   return map[status] || status
 }

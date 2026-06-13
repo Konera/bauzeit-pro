@@ -76,6 +76,11 @@ export function EmployeeLiveCard({
             <div className="flex items-center gap-2 text-xs text-slate-400">
               <MapPin size={12} />
               <span>{activeEntry.site.name}</span>
+              {activeEntry.gps_warning && (
+                <span className="badge badge-gps-warning text-xs px-1.5 py-0.5 ml-1" title="Außerhalb des Baustellen-Radius">
+                  ⚠️ GPS
+                </span>
+              )}
             </div>
           )}
 

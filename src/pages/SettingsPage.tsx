@@ -1,14 +1,22 @@
-// Einstellungen-Seite: Arbeitszeit, Erinnerungen, Push, Vibration
+// Einstellungen-Seite: Arbeitszeit, Erinnerungen, Push, Vibration, App-Diagnose
 import React, { useState, useEffect } from 'react'
 import {
-  ArrowLeft, Bell, Clock, Smartphone, Save, Globe,
-  Moon, Volume2, Check, AlertCircle
+  ArrowLeft, Bell, Clock, Smartphone, Save, Globe, Coffee,
+  Moon, Volume2, Check, AlertCircle, Navigation, Cpu, ShieldCheck, MapPin
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { useNotifications } from '../hooks/useNotifications'
+import { useTranslation } from '../i18n/LanguageContext'
+
 import { NotificationPermissionCard } from '../components/NotificationPermissionCard'
+import { getPlatformInfo } from '../utils/platform'
+import { locationService } from '../services/locationService'
+import { hapticsService } from '../services/hapticsService'
+import { mobileNotificationService } from '../services/mobileNotificationService'
 import type { AppSettings } from '../types/database'
+import { workStartReminderService } from '../services/workStartReminderService'
+import { backgroundGeofenceService } from '../services/backgroundGeofenceService'
+import { NotificationTestCenter } from '../components/NotificationTestCenter'
 
 const defaultSettings: AppSettings = {
   maxWorkHours: 8,
@@ -17,6 +25,19 @@ const defaultSettings: AppSettings = {
   vibration: true,
   language: 'de',
   theme: 'dark',
+  // Phase 3: Smart Automation
+  maxPauseMinutes: 45,
+  pauseWarningBeforeMinutes: 5,
+  autoPauseEnd: false,
+  workStartReminderEnabled: true,
+  workStartTime: '07:00',
+  workDays: [1, 2, 3, 4, 5, 6], // Mo-Sa
+  // Phase 3B: Geofence & Bewegungserkennung
+  backgroundGpsEnabled: true,
+  geofenceAutoClockIn: true,
+  geofenceAutoClockOut: true,
+  geofenceNotifyOnly: true,   // Standard: Nur Notification (sicher)
+  motionDetectionEnabled: true,
 }
 
 function getSettings(): AppSettings {
@@ -26,15 +47,26 @@ function getSettings(): AppSettings {
 }
 
 function saveSettings(settings: AppSettings) {
+  // H3 FIX: Parallel in localStorage (synchron) + IndexedDB (persistent)
   localStorage.setItem('bauzeit_settings', JSON.stringify(settings))
+  try {
+    // Async IndexedDB-Persistenz im Hintergrund
+    import('../services/settingsService').then(m => m.saveSettings(settings as never)).catch(() => {})
+  } catch {
+    // Non-blocking
+  }
 }
 
 export function SettingsPage() {
   const { user, isAdmin, isAdminOrManager } = useAuth()
-  const { testVibration, testNotification, supportsVibration } = useNotifications(user?.id)
+  const { t, language, setLanguage, languageNames, availableLanguages } = useTranslation()
+
 
   const [settings, setSettings] = useState<AppSettings>(getSettings)
   const [saved, setSaved] = useState(false)
+  const [gpsTestResult, setGpsTestResult] = useState<string | null>(null)
+  const [gpsTestLoading, setGpsTestLoading] = useState(false)
+  const platformInfo = getPlatformInfo()
 
   const handleSave = () => {
     saveSettings(settings)
@@ -59,8 +91,9 @@ export function SettingsPage() {
           >
             <ArrowLeft size={20} />
           </Link>
+          <img src="/icon-512.png" alt="BauZeit Pro" className="w-9 h-9 rounded-xl shadow-lg" />
           <div className="flex-1">
-            <h1 className="text-lg font-bold text-white">Einstellungen</h1>
+            <h1 className="text-lg font-bold text-white">{t('settings_title')}</h1>
             <p className="text-xs text-slate-500">{user?.profile.full_name}</p>
           </div>
           <button
@@ -72,7 +105,7 @@ export function SettingsPage() {
             }`}
           >
             {saved ? <Check size={16} /> : <Save size={16} />}
-            {saved ? 'Gespeichert!' : 'Speichern'}
+            {saved ? t('settings_saved') : t('settings_save')}
           </button>
         </div>
       </header>
@@ -83,11 +116,11 @@ export function SettingsPage() {
         <section>
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
             <Clock size={14} />
-            Arbeitszeit
+            {t('settings_work_hours')}
           </h2>
           <div className="card space-y-4">
             <div>
-              <label className="label">Maximale Arbeitszeit (Stunden)</label>
+              <label className="label">{t('settings_work_hours')}</label>
               <div className="flex items-center gap-3">
                 <input
                   type="range"
@@ -108,7 +141,7 @@ export function SettingsPage() {
             </div>
 
             <div>
-              <label className="label">Erinnerungsintervall (Minuten)</label>
+              <label className="label">{t('settings_reminder')}</label>
               <div className="flex items-center gap-3">
                 <input
                   type="range"
@@ -130,11 +163,285 @@ export function SettingsPage() {
           </div>
         </section>
 
+        {/* Phase 3: Pausen-Management */}
+        <section>
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Coffee size={14} />
+            {t('pause_max')}
+          </h2>
+          <div className="card space-y-4">
+            <div>
+              <label className="label">{t('pause_max')}</label>
+              <p className="text-xs text-slate-500 mb-2">{t('pause_max_sub')}</p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min="15"
+                  max="90"
+                  step="5"
+                  value={settings.maxPauseMinutes}
+                  onChange={e => updateSetting('maxPauseMinutes', parseInt(e.target.value))}
+                  className="flex-1 accent-construction-500"
+                />
+                <span className="text-white font-bold w-14 text-center bg-slate-700 py-1.5 px-2 rounded-lg text-sm">
+                  {settings.maxPauseMinutes}m
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className="label">{t('pause_warning_before')}</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min="2"
+                  max="15"
+                  step="1"
+                  value={settings.pauseWarningBeforeMinutes}
+                  onChange={e => updateSetting('pauseWarningBeforeMinutes', parseInt(e.target.value))}
+                  className="flex-1 accent-construction-500"
+                />
+                <span className="text-white font-bold w-14 text-center bg-slate-700 py-1.5 px-2 rounded-lg text-sm">
+                  {settings.pauseWarningBeforeMinutes}m
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-white font-medium text-sm">{t('pause_auto_end')}</p>
+                <p className="text-xs text-slate-500">{t('pause_auto_end_sub')}</p>
+              </div>
+              <button
+                onClick={() => updateSetting('autoPauseEnd', !settings.autoPauseEnd)}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
+                  settings.autoPauseEnd ? 'bg-construction-500' : 'bg-slate-600'
+                }`}
+              >
+                <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
+                  settings.autoPauseEnd ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Phase 3: Arbeitsbeginn-Erinnerung */}
+        <section>
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <AlertCircle size={14} />
+            {t('work_start_reminder')}
+          </h2>
+          <div className="card space-y-4">
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-white font-medium text-sm">{t('work_start_reminder')}</p>
+                <p className="text-xs text-slate-500">{t('work_start_reminder_sub')}</p>
+              </div>
+              <button
+                onClick={() => {
+                  const newVal = !settings.workStartReminderEnabled
+                  updateSetting('workStartReminderEnabled', newVal)
+                  // Erinnerungen sofort aktualisieren
+                  workStartReminderService.scheduleWorkStartReminders({
+                    workStartTime: settings.workStartTime,
+                    workDays: settings.workDays,
+                    enabled: newVal,
+                  }).catch(() => {})
+                }}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
+                  settings.workStartReminderEnabled ? 'bg-construction-500' : 'bg-slate-600'
+                }`}
+              >
+                <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
+                  settings.workStartReminderEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+            </div>
+
+            {settings.workStartReminderEnabled && (
+              <>
+                <div>
+                  <label className="label">{t('work_start_time')}</label>
+                  <input
+                    type="time"
+                    value={settings.workStartTime}
+                    onChange={e => {
+                      updateSetting('workStartTime', e.target.value)
+                      workStartReminderService.scheduleWorkStartReminders({
+                        workStartTime: e.target.value,
+                        workDays: settings.workDays,
+                        enabled: true,
+                      }).catch(() => {})
+                    }}
+                    className="input w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="label">{t('work_start_days')}</label>
+                  <div className="grid grid-cols-7 gap-1.5 mt-2">
+                    {([
+                      { day: 1, key: 'day_mo' as const },
+                      { day: 2, key: 'day_tu' as const },
+                      { day: 3, key: 'day_we' as const },
+                      { day: 4, key: 'day_th' as const },
+                      { day: 5, key: 'day_fr' as const },
+                      { day: 6, key: 'day_sa' as const },
+                      { day: 7, key: 'day_su' as const },
+                    ]).map(({ day, key }) => {
+                      const isActive = settings.workDays.includes(day)
+                      return (
+                        <button
+                          key={day}
+                          onClick={() => {
+                            const newDays = isActive
+                              ? settings.workDays.filter(d => d !== day)
+                              : [...settings.workDays, day].sort()
+                            updateSetting('workDays', newDays)
+                            workStartReminderService.scheduleWorkStartReminders({
+                              workStartTime: settings.workStartTime,
+                              workDays: newDays,
+                              enabled: true,
+                            }).catch(() => {})
+                          }}
+                          className={`py-2.5 rounded-lg text-sm font-bold transition-all active:scale-95 ${
+                            isActive
+                              ? 'bg-construction-500 text-white shadow-lg'
+                              : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                          }`}
+                        >
+                          {t(key)}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+        {/* Phase 3B: GPS & Automatisierung */}
+        <section>
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Navigation size={14} />
+            {t('gps_section')}
+          </h2>
+          <div className="card space-y-4">
+            {/* Hauptschalter: Hintergrund-GPS */}
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-white font-medium text-sm">{t('gps_background')}</p>
+                <p className="text-xs text-slate-500">{t('gps_background_sub')}</p>
+              </div>
+              <button
+                onClick={() => updateSetting('backgroundGpsEnabled', !settings.backgroundGpsEnabled)}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
+                  settings.backgroundGpsEnabled ? 'bg-construction-500' : 'bg-slate-600'
+                }`}
+              >
+                <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
+                  settings.backgroundGpsEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+            </div>
+
+            {settings.backgroundGpsEnabled && (
+              <>
+                {/* Auto-Einstempeln */}
+                <div className="flex items-center justify-between py-2 pl-3 border-l-2 border-construction-500/30">
+                  <div>
+                    <p className="text-white font-medium text-sm">{t('gps_auto_clock_in')}</p>
+                    <p className="text-xs text-slate-500">{t('gps_auto_clock_in_sub')}</p>
+                  </div>
+                  <button
+                    onClick={() => updateSetting('geofenceAutoClockIn', !settings.geofenceAutoClockIn)}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
+                      settings.geofenceAutoClockIn ? 'bg-construction-500' : 'bg-slate-600'
+                    }`}
+                  >
+                    <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
+                      settings.geofenceAutoClockIn ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+
+                {/* Auto-Ausstempeln */}
+                <div className="flex items-center justify-between py-2 pl-3 border-l-2 border-construction-500/30">
+                  <div>
+                    <p className="text-white font-medium text-sm">{t('gps_auto_clock_out')}</p>
+                    <p className="text-xs text-slate-500">{t('gps_auto_clock_out_sub')}</p>
+                  </div>
+                  <button
+                    onClick={() => updateSetting('geofenceAutoClockOut', !settings.geofenceAutoClockOut)}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
+                      settings.geofenceAutoClockOut ? 'bg-construction-500' : 'bg-slate-600'
+                    }`}
+                  >
+                    <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
+                      settings.geofenceAutoClockOut ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+
+                {/* Nur Notification */}
+                <div className="flex items-center justify-between py-2 pl-3 border-l-2 border-paused/30">
+                  <div>
+                    <p className="text-white font-medium text-sm">{t('gps_notify_only')}</p>
+                    <p className="text-xs text-slate-500">{t('gps_notify_only_sub')}</p>
+                  </div>
+                  <button
+                    onClick={() => updateSetting('geofenceNotifyOnly', !settings.geofenceNotifyOnly)}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
+                      settings.geofenceNotifyOnly ? 'bg-paused' : 'bg-slate-600'
+                    }`}
+                  >
+                    <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
+                      settings.geofenceNotifyOnly ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+
+                {/* Losfahrt-Erkennung */}
+                <div className="flex items-center justify-between py-2 pl-3 border-l-2 border-construction-500/30">
+                  <div>
+                    <p className="text-white font-medium text-sm">{t('gps_motion')}</p>
+                    <p className="text-xs text-slate-500">{t('gps_motion_sub')}</p>
+                  </div>
+                  <button
+                    onClick={() => updateSetting('motionDetectionEnabled', !settings.motionDetectionEnabled)}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
+                      settings.motionDetectionEnabled ? 'bg-construction-500' : 'bg-slate-600'
+                    }`}
+                  >
+                    <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
+                      settings.motionDetectionEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+
+                {/* Modus-Anzeige */}
+                <div className="bg-slate-800 rounded-xl p-3 text-xs text-slate-400">
+                  <span className="font-semibold text-white">
+                    {settings.geofenceNotifyOnly ? '🟡 ' : '🟢 '}
+                    {settings.geofenceNotifyOnly ? t('gps_notify_only') : 'Voll-Auto'}
+                  </span>
+                  <span className="ml-1">
+                    – {settings.geofenceNotifyOnly
+                      ? t('gps_notify_only_sub')
+                      : t('gps_auto_clock_in_sub')}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+
         {/* Benachrichtigungen */}
         <section>
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
             <Bell size={14} />
-            Benachrichtigungen
+            {t('settings_notifications')}
           </h2>
 
           <NotificationPermissionCard userId={user?.id} />
@@ -148,18 +455,18 @@ export function SettingsPage() {
               </div>
               <button
                 onClick={() => updateSetting('pushNotifications', !settings.pushNotifications)}
-                className={`relative w-12 h-6 rounded-full transition-colors ${
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
                   settings.pushNotifications ? 'bg-construction-500' : 'bg-slate-600'
                 }`}
               >
-                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                  settings.pushNotifications ? 'translate-x-6' : 'translate-x-0.5'
+                <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
+                  settings.pushNotifications ? 'translate-x-6' : 'translate-x-1'
                 }`} />
               </button>
             </div>
 
             {/* Vibration Toggle */}
-            {supportsVibration && (
+            {platformInfo.supports.vibration && (
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-white font-medium text-sm">Vibration</p>
@@ -167,35 +474,32 @@ export function SettingsPage() {
                 </div>
                 <button
                   onClick={() => updateSetting('vibration', !settings.vibration)}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
                     settings.vibration ? 'bg-construction-500' : 'bg-slate-600'
                   }`}
                 >
-                  <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                    settings.vibration ? 'translate-x-6' : 'translate-x-0.5'
+                  <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
+                    settings.vibration ? 'translate-x-6' : 'translate-x-1'
                   }`} />
                 </button>
               </div>
             )}
 
-            {/* Test-Buttons */}
-            <div className="pt-2 border-t border-slate-700 flex gap-2">
-              <button
-                onClick={testNotification}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-sm transition-colors"
-              >
-                <Bell size={14} />
-                Notification testen
-              </button>
-              {supportsVibration && (
+            {/* Phase 3B: Test-Center */}
+            <div className="pt-3 border-t border-slate-700">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                {t('notif_test_center')}
+              </h3>
+              <NotificationTestCenter />
+              <div className="mt-2">
                 <button
-                  onClick={testVibration}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-sm transition-colors"
+                  onClick={() => hapticsService.vibrateWarning()}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-xs transition-colors active:scale-95"
                 >
-                  <Smartphone size={14} />
+                  <Smartphone size={13} />
                   Vibration testen
                 </button>
-              )}
+              </div>
             </div>
           </div>
         </section>
@@ -204,46 +508,146 @@ export function SettingsPage() {
         <section>
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
             <Globe size={14} />
-            Sprache
+            {t('settings_language')}
           </h2>
           <div className="card">
+            <p className="text-xs text-slate-500 mb-3">{t('settings_language_sub')}</p>
             <div className="grid grid-cols-3 gap-2">
-              {([
-                { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
-                { code: 'ru', label: 'Русский', flag: '🇷🇺' },
-                { code: 'en', label: 'English', flag: '🇬🇧' },
-              ] as const).map(lang => (
+              {availableLanguages.map(lang => (
                 <button
-                  key={lang.code}
-                  onClick={() => updateSetting('language', lang.code)}
+                  key={lang}
+                  onClick={() => {
+                    setLanguage(lang)
+                    updateSetting('language', lang)
+                  }}
                   className={`p-3 rounded-xl border transition-all text-sm flex flex-col items-center gap-1 ${
-                    settings.language === lang.code
+                    language === lang
                       ? 'border-construction-500 bg-construction-500/20 text-white'
                       : 'border-slate-600 text-slate-400 hover:border-slate-500'
                   }`}
                 >
-                  <span className="text-2xl">{lang.flag}</span>
-                  <span className="text-xs">{lang.label}</span>
-                  {settings.language === lang.code && (
+                  <span className="text-2xl">{lang === 'de' ? '🇩🇪' : lang === 'en' ? '🇬🇧' : '🇷🇺'}</span>
+                  <span className="text-xs">{languageNames[lang]}</span>
+                  {language === lang && (
                     <Check size={12} className="text-construction-400" />
                   )}
                 </button>
               ))}
             </div>
-            <p className="text-xs text-slate-500 mt-3 flex items-center gap-1.5">
-              <AlertCircle size={12} />
-              Russisch und Englisch werden in einer zukünftigen Version vollständig unterstützt
-            </p>
           </div>
         </section>
 
-        {/* Über die App */}
+        {/* Über die App + Diagnose (Phase 3) */}
         <section>
-          <div className="card border-slate-700/50 bg-slate-800/30">
-            <p className="text-slate-500 text-sm text-center">
-              BauZeit Pro v1.0.0<br />
-              <span className="text-xs">Digitale Stundenzettel für Baustellen</span>
-            </p>
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Cpu size={14} />
+            {t('settings_app_info')}
+          </h2>
+          <div className="card space-y-4">
+            {/* App-Modus */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-white font-medium text-sm">{t('settings_platform')}</p>
+                <p className="text-xs text-slate-500">{t('settings_platform')}</p>
+              </div>
+              <span className="px-3 py-1.5 bg-construction-500/10 text-construction-400 rounded-xl text-xs font-bold">
+                {platformInfo.name}
+              </span>
+            </div>
+
+            {/* Feature-Support */}
+            <div className="space-y-2 pt-2 border-t border-slate-700">
+              <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Feature-Support</p>
+              {([
+                { label: 'GPS / Geolocation', supported: platformInfo.supports.geolocation, icon: <Navigation size={14} /> },
+                { label: 'Push-Benachrichtigungen', supported: platformInfo.supports.push, icon: <Bell size={14} /> },
+                { label: 'Vibration / Haptics', supported: platformInfo.supports.vibration, icon: <Smartphone size={14} /> },
+                { label: 'Kamera (vorbereitet)', supported: platformInfo.supports.camera, icon: <Cpu size={14} /> },
+              ]).map(feat => (
+                <div key={feat.label} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 text-slate-300">
+                    {feat.icon}
+                    {feat.label}
+                  </div>
+                  <span className={`text-xs font-medium ${
+                    feat.supported ? 'text-working' : 'text-stopped'
+                  }`}>
+                    {feat.supported ? '✅ Verfügbar' : '❌ Nicht verfügbar'}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Test-Buttons (Phase 3) */}
+            <div className="pt-2 border-t border-slate-700 space-y-2">
+              <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Tests</p>
+              <div className="grid grid-cols-2 gap-2">
+                {/* GPS Test */}
+                <button
+                  onClick={async () => {
+                    setGpsTestLoading(true)
+                    setGpsTestResult(null)
+                    const pos = await locationService.getCurrentPosition()
+                    if (pos) {
+                      setGpsTestResult(`✅ ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)} (±${pos.accuracy.toFixed(0)}m)`)
+                    } else {
+                      setGpsTestResult('❌ Position nicht ermittelbar')
+                    }
+                    setGpsTestLoading(false)
+                  }}
+                  disabled={gpsTestLoading}
+                  className="flex items-center justify-center gap-2 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-xs transition-colors disabled:opacity-50"
+                >
+                  <MapPin size={14} />
+                  {gpsTestLoading ? 'Suche...' : 'GPS testen'}
+                </button>
+
+                {/* Notification Test */}
+                <button
+                  onClick={() => mobileNotificationService.testNotification()}
+                  className="flex items-center justify-center gap-2 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-xs transition-colors"
+                >
+                  <Bell size={14} />
+                  {t('settings_test_notif')}
+                </button>
+
+                {/* Vibration Test */}
+                <button
+                  onClick={() => hapticsService.vibrateSuccess()}
+                  className="flex items-center justify-center gap-2 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-xs transition-colors"
+                >
+                  <Smartphone size={14} />
+                  Vibration testen
+                </button>
+
+                {/* Berechtigungen anfragen */}
+                <button
+                  onClick={async () => {
+                    await locationService.requestLocationPermission()
+                    await mobileNotificationService.requestPermission()
+                  }}
+                  className="flex items-center justify-center gap-2 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-xs transition-colors"
+                >
+                  <ShieldCheck size={14} />
+                  {t('settings_notif_permission')}
+                </button>
+              </div>
+
+              {/* GPS Test-Ergebnis */}
+              {gpsTestResult && (
+                <p className="text-xs text-slate-400 bg-slate-800 p-2 rounded-lg font-mono">
+                  {gpsTestResult}
+                </p>
+              )}
+            </div>
+
+            {/* Version */}
+            <div className="pt-2 border-t border-slate-700">
+              <p className="text-slate-500 text-sm text-center">
+                {t('settings_version')}<br />
+                <span className="text-xs">BauZeit Pro</span>
+              </p>
+            </div>
           </div>
         </section>
       </main>

@@ -277,6 +277,21 @@
     color: #cbd5e1;
     border: 1px solid #475569;
   }
+  .badge-rejected {
+    background-color: rgba(239,68,68,0.15);
+    color: var(--color-stopped);
+    border: 1px solid rgba(239,68,68,0.3);
+  }
+  .badge-gps-warning {
+    background-color: rgba(234,179,8,0.15);
+    color: var(--color-paused);
+    border: 1px solid rgba(234,179,8,0.3);
+  }
+  .badge-gps-ok {
+    background-color: rgba(34,197,94,0.15);
+    color: var(--color-working);
+    border: 1px solid rgba(34,197,94,0.3);
+  }
 
   /* --- Form-Elemente --- */
   .input {

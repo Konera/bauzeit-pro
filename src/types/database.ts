@@ -2,7 +2,7 @@
 // Entspricht den Supabase-Tabellen exakt
 
 export type UserRole = 'admin' | 'manager' | 'employee'
-export type TimeEntryStatus = 'open' | 'submitted' | 'approved' | 'corrected'
+export type TimeEntryStatus = 'open' | 'submitted' | 'approved' | 'corrected' | 'rejected'
 export type WorkingStatus = 'not_started' | 'working' | 'paused' | 'finished'
 
 // =========================================
@@ -57,12 +57,21 @@ export interface TimeEntry {
   end_lng: number | null
   source: string
   admin_comment: string | null
+  // Phase 2: Genehmigungs-Felder
+  approved_by: string | null
+  approved_at: string | null
+  rejected_reason: string | null
+  // Phase 2: GPS-Felder
+  gps_warning: boolean
+  start_distance_m: number | null
+  end_distance_m: number | null
   created_at: string
   updated_at: string
   // Joins
   employee?: Profile
   site?: ConstructionSite
   breaks?: BreakEntry[]
+  approved_by_profile?: Profile
 }
 
 export interface BreakEntry {
@@ -148,6 +157,19 @@ export interface AppSettings {
   vibration: boolean
   language: 'de' | 'ru' | 'en'
   theme: 'dark' | 'system'
+  // Phase 3: Smart Automation
+  maxPauseMinutes: number          // Max. Pausendauer (Standard: 45)
+  pauseWarningBeforeMinutes: number  // Vorwarnung vor Pause-Ende (Standard: 5)
+  autoPauseEnd: boolean            // Auto-Ende bei Überschreitung
+  workStartReminderEnabled: boolean  // Arbeitsbeginn-Erinnerung aktiv
+  workStartTime: string            // Planmäßiger Arbeitsbeginn (z.B. "07:00")
+  workDays: number[]               // Arbeitstage [1,2,3,4,5,6] = Mo-Sa
+  // Phase 3B: Geofence & Bewegungserkennung
+  backgroundGpsEnabled: boolean      // Hintergrund-GPS Hauptschalter
+  geofenceAutoClockIn: boolean       // Auto-Einstempeln bei Baustellen-Betreten
+  geofenceAutoClockOut: boolean      // Auto-Ausstempeln bei Baustellen-Verlassen
+  geofenceNotifyOnly: boolean        // Nur Notification statt Auto-Stempel
+  motionDetectionEnabled: boolean    // Losfahrt-Erkennung
 }
 
 // GPS Position

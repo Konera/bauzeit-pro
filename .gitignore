@@ -28,3 +28,14 @@ dist-ssr
 .env.local
 .env.*.local
 .env.production
+
+# Capacitor – Native Build Artefakte
+android/app/build/
+android/.gradle/
+android/app/release/
+ios/App/Pods/
+ios/App/build/
+*.keystore
+*.jks
+google-services.json
+GoogleService-Info.plist

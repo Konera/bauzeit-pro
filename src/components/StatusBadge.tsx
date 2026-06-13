@@ -72,6 +72,7 @@ const timeEntryStatusConfig = {
   submitted: { label: 'Eingereicht', className: 'badge-submitted' },
   approved: { label: 'Genehmigt', className: 'badge-approved' },
   corrected: { label: 'Korrigiert', className: 'badge-corrected' },
+  rejected: { label: 'Abgelehnt', className: 'badge-rejected' },
 }
 
 export function TimeEntryStatusBadge({ status, size = 'md' }: TimeEntryStatusBadgeProps) {

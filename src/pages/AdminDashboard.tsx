@@ -12,7 +12,7 @@ import { ExportButton } from '../components/ExportButton'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { OfflineStatusBanner } from '../components/OfflineStatusBanner'
 import { supabase } from '../lib/supabase'
-import { approveTimeEntry, correctTimeEntry, getTimeEntries, getAllActiveEmployees, getConstructionSites } from '../services/timeTrackingService'
+import { approveTimeEntry, correctTimeEntry, rejectTimeEntry, getTimeEntries, getAllActiveEmployees, getConstructionSites } from '../services/timeTrackingService'
 import type { TimeEntry, Profile, ConstructionSite, WorkingStatus } from '../types/database'
 import { formatMinutes } from '../utils/timeUtils'
 import { differenceInMinutes as dfDiff } from 'date-fns'
@@ -49,6 +49,11 @@ export function AdminDashboard() {
   const [showCorrectModal, setShowCorrectModal] = useState(false)
   const [correctComment, setCorrectComment] = useState('')
   const [correcting, setCorrecting] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+
+  // Phase 2: Reject
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
 
   // =========================================
   // Daten laden
@@ -66,44 +71,44 @@ export function AdminDashboard() {
 
       setSites(allSites || [])
 
-      // Live-Status aller Mitarbeiter ermitteln
-      const liveData = await Promise.all(
-        (employees || []).map(async (emp) => {
-          const { data: entryRaw } = await supabase
-            .from('time_entries')
-            .select(`*, site:construction_sites(*), breaks:break_entries(*)`)
-            .eq('employee_id', emp.id)
-            .is('end_time', null)
-            .maybeSingle()
+      // H6: Alle offenen Einträge + Pausen in EINER Query laden (statt N+1 pro Mitarbeiter)
+      const { data: allOpenEntries } = await supabase
+        .from('time_entries')
+        .select('*, site:construction_sites(*), breaks:break_entries(*)')
+        .is('end_time', null)
+        .order('start_time', { ascending: false })
 
-          const entry = entryRaw as TimeEntry | null
+      // Map: employee_id → erster offener Eintrag (neuester zuerst durch order)
+      const openEntryMap = new Map<string, TimeEntry>()
+      for (const entry of (allOpenEntries || []) as TimeEntry[]) {
+        if (!openEntryMap.has(entry.employee_id)) {
+          openEntryMap.set(entry.employee_id, entry)
+        }
+      }
 
-          const { data: openBreakRaw } = entry
-            ? await supabase
-                .from('break_entries')
-                .select('*')
-                .eq('time_entry_id', entry.id)
-                .is('end_time', null)
-                .maybeSingle()
-            : { data: null }
+      // Live-Status aller Mitarbeiter aus der Map ableiten (0 zusätzliche Queries)
+      const liveData = (employees || []).map((emp) => {
+        const entry = openEntryMap.get(emp.id) || null
 
-          const openBreak = openBreakRaw as { id: string } | null
+        // Offene Pause aus den bereits geladenen breaks ermitteln
+        const openBreak = entry?.breaks?.find(
+          (b: { end_time: string | null }) => !b.end_time
+        ) || null
 
-          const status: WorkingStatus = !entry
-            ? 'not_started'
-            : openBreak
-            ? 'paused'
-            : 'working'
+        const status: WorkingStatus = !entry
+          ? 'not_started'
+          : openBreak
+          ? 'paused'
+          : 'working'
 
-          const workedMinutes = entry
-            ? Math.max(0, dfDiff(new Date(), new Date(entry.start_time)) - (entry.pause_minutes || 0))
-            : 0
+        const workedMinutes = entry
+          ? Math.max(0, dfDiff(new Date(), new Date(entry.start_time)) - (entry.pause_minutes || 0))
+          : 0
 
-          const isOvertime = status === 'working' && workedMinutes > 8 * 60
+        const isOvertime = status === 'working' && workedMinutes > 8 * 60
 
-          return { employee: emp, activeEntry: entry, status, workedMinutes, isOvertime }
-        })
-      )
+        return { employee: emp, activeEntry: entry, status, workedMinutes, isOvertime }
+      })
 
       setLiveEmployees(liveData)
 
@@ -116,7 +121,10 @@ export function AdminDashboard() {
         week: (() => {
           const now = new Date()
           const monday = new Date(now)
-          monday.setDate(now.getDate() - now.getDay() + 1)
+          // K8 FIX: Am Sonntag (getDay()=0) → 6 Tage zurück statt 1 vorwärts
+          const dayOfWeek = now.getDay()
+          const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+          monday.setDate(now.getDate() + diff)
           return {
             from: monday.toISOString().split('T')[0] + 'T00:00:00',
             to: now.toISOString().split('T')[0] + 'T23:59:59',
@@ -173,11 +181,14 @@ export function AdminDashboard() {
   const handleApprove = async () => {
     if (!selectedEntry || !user) return
     setCorrecting(true)
+    setActionError(null)
     try {
       await approveTimeEntry(selectedEntry.id, user.id, correctComment || undefined)
       await loadData()
       setShowApproveModal(false)
       setCorrectComment('')
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Genehmigung fehlgeschlagen')
     } finally {
       setCorrecting(false)
     }
@@ -185,14 +196,39 @@ export function AdminDashboard() {
 
   const handleCorrect = async () => {
     if (!selectedEntry || !user) return
+    // Phase 2: Client-seitige Validierung – Kommentar ist Pflicht
+    if (!correctComment.trim()) {
+      setActionError('Ein Kommentar ist bei Korrekturen Pflicht.')
+      return
+    }
     setCorrecting(true)
+    setActionError(null)
     try {
       await correctTimeEntry(selectedEntry.id, user.id, {
-        admin_comment: correctComment || undefined,
+        admin_comment: correctComment,
       })
       await loadData()
       setShowCorrectModal(false)
       setCorrectComment('')
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Korrektur fehlgeschlagen')
+    } finally {
+      setCorrecting(false)
+    }
+  }
+
+  // Phase 2: Ablehnen
+  const handleReject = async () => {
+    if (!selectedEntry || !user || !rejectReason.trim()) return
+    setCorrecting(true)
+    setActionError(null)
+    try {
+      await rejectTimeEntry(selectedEntry.id, user.id, rejectReason)
+      await loadData()
+      setShowRejectModal(false)
+      setRejectReason('')
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Ablehnung fehlgeschlagen')
     } finally {
       setCorrecting(false)
     }
@@ -232,11 +268,14 @@ export function AdminDashboard() {
       {/* Header */}
       <header className="bg-slate-900 border-b border-slate-800 px-4 py-4 safe-top">
         <div className="flex items-center justify-between max-w-5xl mx-auto">
-          <div>
-            <h1 className="text-lg font-bold text-white">
-              {isAdmin ? '⚙️ Admin' : '👷 Bauleiter'}-Dashboard
-            </h1>
-            <p className="text-xs text-slate-500">{user?.profile.full_name}</p>
+          <div className="flex items-center gap-3">
+            <img src="/icon-512.png" alt="BauZeit Pro" className="w-10 h-10 rounded-xl shadow-lg" />
+            <div>
+              <h1 className="text-lg font-bold text-white">
+                {isAdmin ? '⚙️ Admin' : '👷 Bauleiter'}-Dashboard
+              </h1>
+              <p className="text-xs text-slate-500">{user?.profile.full_name}</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -357,6 +396,7 @@ export function AdminDashboard() {
                   <option value="submitted">Eingereicht</option>
                   <option value="approved">Genehmigt</option>
                   <option value="corrected">Korrigiert</option>
+                  <option value="rejected">Abgelehnt</option>
                 </select>
 
                 <ExportButton entries={filteredEntries} />
@@ -412,6 +452,11 @@ export function AdminDashboard() {
                 setCorrectComment(entry.admin_comment || '')
                 setShowCorrectModal(true)
               }}
+              onReject={(entry) => {
+                setSelectedEntry(entry)
+                setRejectReason('')
+                setShowRejectModal(true)
+              }}
             />
           )}
         </div>
@@ -451,14 +496,48 @@ export function AdminDashboard() {
         loading={correcting}
       >
         <div>
-          <label className="label">Admin-Kommentar</label>
+          <label className="label">Admin-Kommentar (Pflicht)</label>
           <textarea
             value={correctComment}
-            onChange={e => setCorrectComment(e.target.value)}
+            onChange={e => { setCorrectComment(e.target.value); setActionError(null) }}
             placeholder="Kommentar eingeben..."
             className="input resize-none h-24"
             autoFocus
+            required
           />
+          {correctComment.trim() === '' && (
+            <p className="text-xs text-paused mt-1">Ein Kommentar ist bei Korrekturen Pflicht.</p>
+          )}
+          {actionError && (
+            <p className="text-xs text-stopped mt-2">❌ {actionError}</p>
+          )}
+        </div>
+      </ConfirmModal>
+
+      {/* Ablehnen Modal (Phase 2) */}
+      <ConfirmModal
+        isOpen={showRejectModal}
+        onClose={() => setShowRejectModal(false)}
+        onConfirm={handleReject}
+        title="Zeiteintrag ablehnen?"
+        message={`Zeiteintrag von ${selectedEntry?.employee?.full_name} ablehnen?`}
+        confirmLabel="❌ Ablehnen"
+        variant="danger"
+        loading={correcting}
+      >
+        <div>
+          <label className="label">Ablehnungsgrund (Pflicht)</label>
+          <textarea
+            value={rejectReason}
+            onChange={e => setRejectReason(e.target.value)}
+            placeholder="Grund für die Ablehnung eingeben..."
+            className="input resize-none h-24"
+            autoFocus
+            required
+          />
+          {rejectReason.trim() === '' && (
+            <p className="text-xs text-stopped mt-1">Ein Ablehnungsgrund ist Pflicht.</p>
+          )}
         </div>
       </ConfirmModal>
     </div>

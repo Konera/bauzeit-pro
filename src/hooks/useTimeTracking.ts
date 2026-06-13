@@ -2,6 +2,9 @@
 // FIXES: BUG-001 (stale closure timer), BUG-002 (double reminder start),
 //        BUG-006 (timer restart after pause end), BUG-012 (infinite re-renders from settings)
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+
+// H1 FIX: Mutex Ref für Doppelklick-Schutz (synchron, nicht async state)
+const isSubmittingRef = { current: false }
 import type { TimeEntry, BreakEntry, WorkingStatus, ConstructionSite } from '../types/database'
 import {
   getOpenTimeEntry,
@@ -12,7 +15,9 @@ import {
   stopWork,
   getSiteAssignments,
 } from '../services/timeTrackingService'
-import { notificationService } from '../services/notificationService'
+import { mobileNotificationService } from '../services/mobileNotificationService'
+import { locationService } from '../services/locationService'
+import { pauseTimerService } from '../services/pauseTimerService'
 import { calculateWorkedSeconds } from '../utils/timeUtils'
 
 interface TimeTrackingState {
@@ -26,22 +31,31 @@ interface TimeTrackingState {
   loading: boolean
   error: string | null
   syncing: boolean
+  // Phase 2: GPS
+  gpsStatus: 'checking' | 'available' | 'unavailable' | 'denied'
+  gpsWarning: string | null
 }
 
 interface AppSettings {
   maxWorkHours: number
   reminderAfterMinutes: number
+  maxPauseMinutes: number
+  pauseWarningBeforeMinutes: number
+  autoPauseEnd: boolean
 }
 
 export function useTimeTracking(
   employeeId: string | undefined,
-  settings: AppSettings = { maxWorkHours: 8, reminderAfterMinutes: 15 }
+  settings: AppSettings = { maxWorkHours: 8, reminderAfterMinutes: 15, maxPauseMinutes: 45, pauseWarningBeforeMinutes: 5, autoPauseEnd: false }
 ) {
   // BUG-012 Fix: Einstellungen über useMemo stabilisieren damit kein infinite loop entsteht
   const stableSettings = useMemo(() => ({
     maxWorkHours: settings.maxWorkHours,
     reminderAfterMinutes: settings.reminderAfterMinutes,
-  }), [settings.maxWorkHours, settings.reminderAfterMinutes])
+    maxPauseMinutes: settings.maxPauseMinutes,
+    pauseWarningBeforeMinutes: settings.pauseWarningBeforeMinutes,
+    autoPauseEnd: settings.autoPauseEnd,
+  }), [settings.maxWorkHours, settings.reminderAfterMinutes, settings.maxPauseMinutes, settings.pauseWarningBeforeMinutes, settings.autoPauseEnd])
 
   const [state, setState] = useState<TimeTrackingState>({
     activeEntry: null,
@@ -54,12 +68,38 @@ export function useTimeTracking(
     loading: true,
     error: null,
     syncing: false,
+    gpsStatus: 'checking',
+    gpsWarning: null,
   })
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // Refs für stabile Zugriffe in Closures (BUG-001 Fix)
   const activeEntryRef = useRef<TimeEntry | null>(null)
   const currentBreakRef = useRef<BreakEntry | null>(null)
+
+  // Phase 2/3: GPS-Status beim Mount prüfen (über locationService)
+  useEffect(() => {
+    async function checkGps() {
+      try {
+        // Timeout: GPS-Check darf maximal 3 Sekunden dauern
+        const status = await Promise.race([
+          locationService.checkLocationPermission(),
+          new Promise<'unavailable'>((resolve) => setTimeout(() => resolve('unavailable'), 3000)),
+        ])
+        setState(prev => ({
+          ...prev,
+          gpsStatus: status === 'granted' ? 'available'
+            : status === 'denied' ? 'denied'
+            : status === 'unavailable' ? 'unavailable'
+            : 'available', // 'prompt' = GPS verfügbar, noch nicht erfragt
+        }))
+      } catch {
+        // GPS-Check fehlgeschlagen → nicht blockieren
+        setState(prev => ({ ...prev, gpsStatus: 'unavailable' }))
+      }
+    }
+    checkGps()
+  }, [])
 
   // Sync Refs mit State
   useEffect(() => {
@@ -109,12 +149,24 @@ export function useTimeTracking(
     setState(prev => ({ ...prev, loading: true, error: null }))
 
     try {
-      const [openEntry, assignedSites] = await Promise.all([
+      // Promise.allSettled: Einzelner Fehler blockiert nicht alles
+      const [entryResult, sitesResult] = await Promise.allSettled([
         getOpenTimeEntry(employeeId),
         getSiteAssignments(employeeId),
       ])
 
+      const openEntry = entryResult.status === 'fulfilled' ? entryResult.value : null
+      const assignedSites = sitesResult.status === 'fulfilled' ? sitesResult.value : []
+
+      if (entryResult.status === 'rejected') {
+        console.error('getOpenTimeEntry fehlgeschlagen:', entryResult.reason)
+      }
+      if (sitesResult.status === 'rejected') {
+        console.error('getSiteAssignments fehlgeschlagen:', sitesResult.reason)
+      }
+
       const sites = assignedSites as unknown as ConstructionSite[]
+      console.log('📊 Daten geladen:', { openEntry: !!openEntry, sites: sites.length, employeeId })
 
       if (openEntry) {
         const openBreak = await getOpenBreak(openEntry.id)
@@ -143,17 +195,28 @@ export function useTimeTracking(
 
         startTimer(openEntry)
 
-        // BUG-002 Fix: Immer erst stoppen, dann neu starten
-        notificationService.stopReminder()
-        notificationService.startReminder(
-          employeeId,
-          openEntry.id,
-          openEntry.start_time,
-          stableSettings.maxWorkHours,
-          stableSettings.reminderAfterMinutes
-        )
+        // Notifications NON-BLOCKING (dürfen UI nicht blockieren)
+        ;(async () => {
+          try {
+            await mobileNotificationService.cancelWorkReminder()
+            await mobileNotificationService.scheduleWorkReminder({
+              timeEntryId: openEntry.id,
+              employeeId,
+              startTime: openEntry.start_time,
+              maxHours: stableSettings.maxWorkHours,
+            })
+            await mobileNotificationService.scheduleRepeatedStopReminder({
+              timeEntryId: openEntry.id,
+              employeeId,
+              intervalMinutes: stableSettings.reminderAfterMinutes,
+            })
+          } catch (err) {
+            console.warn('Notification-Setup fehlgeschlagen (non-blocking):', err)
+          }
+        })()
       } else {
-        notificationService.stopReminder()
+        // Notifications NON-BLOCKING stornieren
+        mobileNotificationService.cancelWorkReminder().catch(() => {})
         stopTimer()
         setState(prev => ({
           ...prev,
@@ -188,17 +251,38 @@ export function useTimeTracking(
   // =========================================
 
   const handleStartWork = useCallback(async () => {
+    // H1 FIX: Synchroner Doppelklick-Schutz
+    if (isSubmittingRef.current) return
+    isSubmittingRef.current = true
+
     if (!employeeId || !state.selectedSiteId) {
       setState(prev => ({
         ...prev,
         error: 'Bitte zuerst eine Baustelle auswählen',
       }))
+      isSubmittingRef.current = false
       return
     }
 
-    setState(prev => ({ ...prev, syncing: true, error: null }))
+    setState(prev => ({ ...prev, syncing: true, error: null, gpsWarning: null }))
 
     try {
+      // Phase 2/3: GPS-Geofence-Check vor Start (über locationService)
+      const selectedSite = state.sites.find(s => s.id === state.selectedSiteId)
+      if (selectedSite && selectedSite.gps_lat && selectedSite.gps_lng) {
+        const position = await locationService.getCurrentPosition()
+        if (position) {
+          const fence = locationService.isInsideConstructionSite(position, selectedSite)
+          if (!fence.isInside) {
+            setState(prev => ({
+              ...prev,
+              gpsWarning: `Du bist ${fence.distanceMeters}m von der Baustelle entfernt.`,
+            }))
+            // Warnung wird angezeigt, aber Arbeit kann trotzdem gestartet werden
+          }
+        }
+      }
+
       const { entry, error } = await startWork(employeeId, state.selectedSiteId)
 
       if (error) {
@@ -221,26 +305,40 @@ export function useTimeTracking(
 
       startTimer(entry)
 
-      // BUG-002 Fix: Erst stoppen, dann starten
-      notificationService.stopReminder()
-      notificationService.startReminder(
-        employeeId,
-        entry.id,
-        entry.start_time,
-        stableSettings.maxWorkHours,
-        stableSettings.reminderAfterMinutes
-      )
+      // Notifications NON-BLOCKING (dürfen UI nicht blockieren)
+      ;(async () => {
+        try {
+          await mobileNotificationService.cancelWorkReminder()
+          await mobileNotificationService.scheduleWorkReminder({
+            timeEntryId: entry.id,
+            employeeId,
+            startTime: entry.start_time,
+            maxHours: stableSettings.maxWorkHours,
+          })
+          await mobileNotificationService.scheduleRepeatedStopReminder({
+            timeEntryId: entry.id,
+            employeeId,
+            intervalMinutes: stableSettings.reminderAfterMinutes,
+          })
+        } catch (err) {
+          console.warn('Notification-Setup fehlgeschlagen (non-blocking):', err)
+        }
+      })()
     } catch (error) {
       setState(prev => ({
         ...prev,
         syncing: false,
         error: error instanceof Error ? error.message : 'Unbekannter Fehler',
       }))
+    } finally {
+      isSubmittingRef.current = false
     }
-  }, [employeeId, state.selectedSiteId, stableSettings, startTimer])
+  }, [employeeId, state.selectedSiteId, state.sites, stableSettings, startTimer])
 
   const handleStartPause = useCallback(async () => {
-    if (!employeeId || !state.activeEntry) return
+    if (isSubmittingRef.current) return
+    isSubmittingRef.current = true
+    if (!employeeId || !state.activeEntry) { isSubmittingRef.current = false; return }
 
     setState(prev => ({ ...prev, syncing: true, error: null }))
 
@@ -256,14 +354,33 @@ export function useTimeTracking(
         status: 'paused',
         syncing: false,
       }))
+
+      // Phase 3: Pausen-Timer NON-BLOCKING
+      ;(async () => {
+        try {
+          await pauseTimerService.schedulePauseWarning({
+            pauseStartTime: newBreak.start_time,
+            maxPauseMinutes: stableSettings.maxPauseMinutes,
+            warningBeforeMinutes: stableSettings.pauseWarningBeforeMinutes,
+          })
+          await pauseTimerService.schedulePauseAlarm({
+            pauseStartTime: newBreak.start_time,
+            maxPauseMinutes: stableSettings.maxPauseMinutes,
+          })
+        } catch (err) {
+          console.warn('Pausen-Timer-Setup fehlgeschlagen (non-blocking):', err)
+        }
+      })()
     } catch (error) {
       setState(prev => ({
         ...prev,
         syncing: false,
         error: error instanceof Error ? error.message : 'Pause starten fehlgeschlagen',
       }))
+    } finally {
+      isSubmittingRef.current = false
     }
-  }, [employeeId, state.activeEntry])
+  }, [employeeId, state.activeEntry, stableSettings])
 
   const handleEndPause = useCallback(async () => {
     if (!employeeId || !state.activeEntry) return
@@ -272,6 +389,9 @@ export function useTimeTracking(
 
     try {
       const { updatedEntry } = await endPause(state.activeEntry.id, employeeId)
+
+      // Phase 3: Pausen-Alarme stornieren NON-BLOCKING
+      pauseTimerService.cancelPauseAlarms().catch(() => {})
 
       // BUG-006 Fix: Ref sofort auf null setzen, dann Timer neu starten
       currentBreakRef.current = null
@@ -297,14 +417,17 @@ export function useTimeTracking(
   }, [employeeId, state.activeEntry, startTimer])
 
   const handleStopWork = useCallback(async () => {
-    if (!employeeId || !state.activeEntry) return
+    if (isSubmittingRef.current) return
+    isSubmittingRef.current = true
+    if (!employeeId || !state.activeEntry) { isSubmittingRef.current = false; return }
 
     setState(prev => ({ ...prev, syncing: true, error: null }))
 
     try {
       await stopWork(state.activeEntry.id, employeeId)
 
-      notificationService.stopReminder()
+      // NON-BLOCKING
+      mobileNotificationService.cancelWorkReminder().catch(() => {})
       stopTimer()
 
       // Refs clearen
@@ -326,6 +449,8 @@ export function useTimeTracking(
         syncing: false,
         error: error instanceof Error ? error.message : 'Arbeit beenden fehlgeschlagen',
       }))
+    } finally {
+      isSubmittingRef.current = false
     }
   }, [employeeId, state.activeEntry, stopTimer])
 

@@ -1,11 +1,13 @@
 // Login-Seite: E-Mail + Passwort über Supabase Auth
 import React, { useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { HardHat, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
+import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import { useTranslation } from '../i18n/LanguageContext'
 
 export function LoginPage() {
   const { user, login, loading, error } = useAuth()
+  const { t } = useTranslation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -41,17 +43,17 @@ export function LoginPage() {
       <div className="relative flex flex-col items-center justify-center min-h-screen p-6">
         {/* Logo */}
         <div className="mb-8 text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-construction-500 rounded-3xl mb-4 shadow-[0_0_40px_rgba(249,115,22,0.4)]">
-            <HardHat size={40} className="text-white" />
+          <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl mb-4 shadow-[0_0_40px_rgba(249,115,22,0.4)] overflow-hidden">
+            <img src="/icon-512.png" alt="BauZeit Pro" className="w-full h-full object-cover" />
           </div>
-          <h1 className="text-3xl font-black text-white">BauZeit Pro</h1>
-          <p className="text-slate-400 mt-1">Digitale Stundenzettel für Baustellen</p>
+          <h1 className="text-3xl font-black text-white">{t('login_title')}</h1>
+          <p className="text-slate-400 mt-1">{t('login_subtitle')}</p>
         </div>
 
         {/* Login-Formular */}
         <div className="w-full max-w-sm">
           <div className="card bg-slate-800/80 backdrop-blur-sm border-slate-700">
-            <h2 className="text-xl font-bold text-white mb-6">Anmelden</h2>
+            <h2 className="text-xl font-bold text-white mb-6">{t('login_heading')}</h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Fehlermeldung */}
@@ -64,13 +66,13 @@ export function LoginPage() {
 
               {/* E-Mail */}
               <div>
-                <label htmlFor="email" className="label">E-Mail-Adresse</label>
+                <label htmlFor="email" className="label">{t('login_email')}</label>
                 <input
                   id="email"
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="name@firma.de"
+                  placeholder={t('login_email_placeholder')}
                   autoComplete="email"
                   autoCapitalize="none"
                   className="input"
@@ -81,14 +83,14 @@ export function LoginPage() {
 
               {/* Passwort */}
               <div>
-                <label htmlFor="password" className="label">Passwort</label>
+                <label htmlFor="password" className="label">{t('login_password')}</label>
                 <div className="relative">
                   <input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder={t('login_password_placeholder')}
                     autoComplete="current-password"
                     className="input pr-12"
                     disabled={isLoading}
@@ -98,7 +100,7 @@ export function LoginPage() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
-                    aria-label={showPassword ? 'Passwort verbergen' : 'Passwort anzeigen'}
+                    aria-label={showPassword ? t('login_hide_password') : t('login_show_password')}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -114,10 +116,10 @@ export function LoginPage() {
                 {isLoading ? (
                   <>
                     <Loader2 size={20} className="animate-spin" />
-                    Anmelden...
+                    {t('login_loading')}
                   </>
                 ) : (
-                  'Anmelden'
+                  t('login_button')
                 )}
               </button>
             </form>
@@ -125,13 +127,13 @@ export function LoginPage() {
 
           {/* Info-Text */}
           <p className="text-center text-xs text-slate-600 mt-4">
-            Kein Zugang? Bitte deinen Admin kontaktieren.
+            {t('login_no_access')}
           </p>
         </div>
 
         {/* Version */}
         <p className="absolute bottom-6 text-xs text-slate-700">
-          BauZeit Pro v1.0 · Alle Rechte vorbehalten
+          {t('login_version')}
         </p>
       </div>
     </div>

@@ -1,14 +1,17 @@
 // React Router v6 Konfiguration mit geschützten Routen
+// Code-Splitting: Seiten werden per React.lazy() dynamisch geladen
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { LoginPage } from '../pages/LoginPage'
-import { EmployeeDashboard } from '../pages/EmployeeDashboard'
-import { AdminDashboard } from '../pages/AdminDashboard'
-import { SitesPage } from '../pages/SitesPage'
-import { EmployeesPage } from '../pages/EmployeesPage'
-import { TimesheetsPage } from '../pages/TimesheetsPage'
-import { SettingsPage } from '../pages/SettingsPage'
+
+// Lazy-Imports für Code-Splitting (reduziert initiale Bundle-Größe)
+const LoginPage = React.lazy(() => import('../pages/LoginPage').then(m => ({ default: m.LoginPage })))
+const EmployeeDashboard = React.lazy(() => import('../pages/EmployeeDashboard').then(m => ({ default: m.EmployeeDashboard })))
+const AdminDashboard = React.lazy(() => import('../pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })))
+const SitesPage = React.lazy(() => import('../pages/SitesPage').then(m => ({ default: m.SitesPage })))
+const EmployeesPage = React.lazy(() => import('../pages/EmployeesPage').then(m => ({ default: m.EmployeesPage })))
+const TimesheetsPage = React.lazy(() => import('../pages/TimesheetsPage').then(m => ({ default: m.TimesheetsPage })))
+const SettingsPage = React.lazy(() => import('../pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
 
 // =========================================
 // Route-Schutz Komponenten
@@ -69,6 +72,14 @@ export function AppRouter() {
   const { user } = useAuth()
 
   return (
+    <React.Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="spinner w-10 h-10 mx-auto mb-4" />
+          <p className="text-slate-400 text-sm">Lade...</p>
+        </div>
+      </div>
+    }>
     <Routes>
       {/* Öffentliche Routen */}
       <Route path="/login" element={<LoginPage />} />
@@ -154,5 +165,6 @@ export function AppRouter() {
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </React.Suspense>
   )
 }

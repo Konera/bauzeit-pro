@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || ''
 
-export type NotificationType = 'overtime_warning' | 'forgot_stop' | 'left_site' | 'break_reminder' | 'system'
+export type NotificationType = 'overtime_warning' | 'forgot_stop' | 'left_site' | 'break_reminder' | 'system' | 'pause_warning' | 'pause_expired' | 'pause_overdue' | 'work_start_reminder' | 'geofence_enter' | 'geofence_exit' | 'motion_detected'
 
 export interface NotificationPayload {
   type: NotificationType
@@ -94,7 +94,7 @@ export async function showLocalNotification(payload: NotificationPayload): Promi
 // Vibration
 // =========================================
 
-export function vibrate(pattern: number | number[] = [200, 100, 200]): void {
+export function vibrate(pattern: number | number[] = [300, 200, 300]): void {
   if (navigator.vibrate) navigator.vibrate(pattern)
 }
 
@@ -127,8 +127,8 @@ export function startReminderTimer(
         title: '⚠️ Arbeitszeit überschritten!',
         message: `Du arbeitest seit ${Math.floor(workedMinutes / 60)}h ${workedMinutes % 60}min. Vergiss nicht auszustempeln!`,
         actions: [
-          { action: 'stop_work', title: '✅ Arbeit beenden' },
-          { action: 'continue', title: '▶️ Weiterarbeiten' },
+          { action: 'stop_work', title: 'Arbeit beenden' },
+          { action: 'continue', title: 'Weiterarbeiten' },
         ],
         data: { timeEntryId, employeeId },
       })
@@ -144,7 +144,7 @@ export function startReminderTimer(
     }
   }, 5 * 60 * 1000)
 
-  // Periodische Erinnerung
+  // Periodische Erinnerung alle X Minuten nach Überschreitung
   reminderInterval = setInterval(async () => {
     const workedMinutes = Math.floor((Date.now() - new Date(startTime).getTime()) / 60000)
     if (workedMinutes > maxHours * 60) {
@@ -153,13 +153,13 @@ export function startReminderTimer(
         title: '🔔 Noch eingestempelt',
         message: 'Du bist noch eingestempelt. Arbeit beenden?',
         actions: [
-          { action: 'stop_work', title: '✅ Arbeit beenden' },
-          { action: 'start_pause', title: '⏸️ Pause' },
-          { action: 'continue', title: '▶️ Weiter' },
+          { action: 'stop_work', title: 'Arbeit beenden' },
+          { action: 'start_pause', title: 'Pause starten' },
+          { action: 'continue', title: 'Weiterarbeiten' },
         ],
         data: { timeEntryId, employeeId },
       })
-      vibrate()
+      vibrate([300, 200, 300])
     }
   }, reminderIntervalMinutes * 60 * 1000)
 }
@@ -175,8 +175,8 @@ export async function showLeftSiteWarning(employeeId: string, timeEntryId: strin
     title: '📍 Baustelle verlassen',
     message: 'Du hast die Baustelle verlassen. Ausstempeln?',
     actions: [
-      { action: 'stop_work', title: '✅ Ausstempeln' },
-      { action: 'ignore',    title: '❌ Ignorieren' },
+      { action: 'stop_work', title: 'Ausstempeln' },
+      { action: 'ignore',    title: 'Ignorieren' },
     ],
     data: { timeEntryId, employeeId },
   })

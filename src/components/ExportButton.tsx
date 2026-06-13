@@ -1,9 +1,11 @@
 // ExportButton: PDF und CSV Export
 import React, { useState } from 'react'
-import { Download, FileText, Table, ChevronDown } from 'lucide-react'
+import { Download, FileText, Table, ChevronDown, UserCheck } from 'lucide-react'
 import { clsx } from 'clsx'
 import type { TimeEntry, ExportOptions } from '../types/database'
 import { exportToPDF, exportToCSV } from '../utils/exportUtils'
+import { exportAdminCSV } from '../services/csvExportService'
+import { exportEmployeePDF } from '../services/pdfExportService'
 
 interface ExportButtonProps {
   entries: TimeEntry[]
@@ -27,9 +29,9 @@ export function ExportButton({ entries, options, className }: ExportButtonProps)
 
     try {
       if (format === 'pdf') {
-        exportToPDF(entries, options || {})
+        await exportToPDF(entries, options || {})
       } else {
-        exportToCSV(entries)
+        await exportToCSV(entries)
       }
     } catch (error) {
       console.error('Export fehlgeschlagen:', error)
@@ -73,7 +75,7 @@ export function ExportButton({ entries, options, className }: ExportButtonProps)
             className="fixed inset-0 z-10"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 top-full mt-2 z-20 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden min-w-[180px]">
+          <div className="absolute right-0 top-full mt-2 z-20 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden min-w-[200px]">
             <button
               onClick={() => handleExport('pdf')}
               className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-slate-700 transition-colors text-left"
@@ -86,13 +88,54 @@ export function ExportButton({ entries, options, className }: ExportButtonProps)
             </button>
             <div className="border-t border-slate-700" />
             <button
-              onClick={() => handleExport('csv')}
+              onClick={() => {
+                setIsOpen(false)
+                setLoading('pdf')
+                try {
+                  // Phase 2: Detailliertes Einzel-PDF mit allen Feldern
+                  const employeeNames = [...new Set(entries.map(e => e.employee?.full_name).filter(Boolean))]
+                  exportEmployeePDF({
+                    entries,
+                    employeeName: employeeNames.length === 1 ? employeeNames[0]! : 'Alle Mitarbeiter',
+                  })
+                } catch (error) {
+                  console.error('Detaillierter PDF-Export fehlgeschlagen:', error)
+                  setExportError('PDF-Export fehlgeschlagen')
+                  setTimeout(() => setExportError(null), 4000)
+                } finally {
+                  setLoading(null)
+                }
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-slate-700 transition-colors text-left"
+            >
+              <UserCheck size={16} className="text-admin" />
+              <div>
+                <p className="font-medium">Detailliertes PDF</p>
+                <p className="text-xs text-slate-500">Mit Genehmigungs-Info</p>
+              </div>
+            </button>
+            <div className="border-t border-slate-700" />
+            <button
+              onClick={() => {
+                setIsOpen(false)
+                setLoading('csv')
+                try {
+                  // Phase 2: Erweiterter CSV mit GPS + Genehmigungs-Feldern
+                  exportAdminCSV(entries)
+                } catch (error) {
+                  console.error('CSV-Export fehlgeschlagen:', error)
+                  setExportError('CSV-Export fehlgeschlagen')
+                  setTimeout(() => setExportError(null), 4000)
+                } finally {
+                  setLoading(null)
+                }
+              }}
               className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-slate-700 transition-colors text-left"
             >
               <Table size={16} className="text-working" />
               <div>
                 <p className="font-medium">CSV für Excel</p>
-                <p className="text-xs text-slate-500">Mit deutschen Trennzeichen</p>
+                <p className="text-xs text-slate-500">Alle Felder inkl. GPS</p>
               </div>
             </button>
           </div>

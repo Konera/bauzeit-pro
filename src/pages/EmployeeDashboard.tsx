@@ -2,10 +2,11 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
   Play, Pause, Square, RefreshCw, AlertTriangle, Clock,
-  MapPin, ChevronRight, Settings, LogOut, Bell
+  MapPin, ChevronRight, Settings, LogOut, Bell, Navigation, Wifi
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useTimeTracking } from '../hooks/useTimeTracking'
+import { useTranslation } from '../i18n/LanguageContext'
 import { ButtonPrimary } from '../components/ButtonPrimary'
 import { WorkingStatusBadge } from '../components/StatusBadge'
 import { TimeCounter, MiniTimeDisplay } from '../components/TimeCounter'
@@ -14,6 +15,10 @@ import { ConfirmModal } from '../components/ConfirmModal'
 import { NotificationPermissionCard } from '../components/NotificationPermissionCard'
 import { OfflineStatusBanner } from '../components/OfflineStatusBanner'
 import { formatTime, formatMinutes, isOverTimeLimit } from '../utils/timeUtils'
+import { pauseTimerService } from '../services/pauseTimerService'
+import { autoClockService } from '../services/autoClockService'
+import { GpsInfoCard } from '../components/GpsInfoCard'
+import { isNativeApp, isAndroid, isIOS, isPWA } from '../utils/platform'
 import { Link } from 'react-router-dom'
 
 // Einstellungen aus localStorage laden
@@ -25,13 +30,17 @@ function getSettings() {
 
 export function EmployeeDashboard() {
   const { user, logout } = useAuth()
+  const { t } = useTranslation()
   const settings = getSettings()
 
   // BUG-012 Fix: Settings werden via useMemo stabilisiert → verhindert infinite re-renders
   const stableSettings = useMemo(() => ({
     maxWorkHours: settings.maxWorkHours || 8,
     reminderAfterMinutes: settings.reminderAfterMinutes || 15,
-  }), [settings.maxWorkHours, settings.reminderAfterMinutes])
+    maxPauseMinutes: settings.maxPauseMinutes || 45,
+    pauseWarningBeforeMinutes: settings.pauseWarningBeforeMinutes || 5,
+    autoPauseEnd: settings.autoPauseEnd || false,
+  }), [settings.maxWorkHours, settings.reminderAfterMinutes, settings.maxPauseMinutes, settings.pauseWarningBeforeMinutes, settings.autoPauseEnd])
 
   const {
     activeEntry,
@@ -43,6 +52,8 @@ export function EmployeeDashboard() {
     loading,
     error,
     syncing,
+    gpsStatus,
+    gpsWarning,
     handleStartWork,
     handleStartPause,
     handleEndPause,
@@ -53,6 +64,25 @@ export function EmployeeDashboard() {
 
   const [showStopConfirm, setShowStopConfirm] = useState(false)
   const [showPermissionCard, setShowPermissionCard] = useState(false)
+  const [pauseRemaining, setPauseRemaining] = useState<number | null>(null)
+
+  // Phase 3: Pausen-Countdown Timer
+  useEffect(() => {
+    if (status !== 'paused' || !currentBreak) {
+      setPauseRemaining(null)
+      return
+    }
+    const updatePauseCountdown = () => {
+      const remaining = pauseTimerService.getPauseRemainingSeconds(
+        currentBreak.start_time,
+        stableSettings.maxPauseMinutes
+      )
+      setPauseRemaining(remaining)
+    }
+    updatePauseCountdown()
+    const interval = setInterval(updatePauseCountdown, 1000)
+    return () => clearInterval(interval)
+  }, [status, currentBreak, stableSettings.maxPauseMinutes])
   const [isOvertime, setIsOvertime] = useState(false)
 
   // Überstunden prüfen
@@ -66,14 +96,34 @@ export function EmployeeDashboard() {
     }
   }, [activeEntry, workedSeconds, settings.maxWorkHours])
 
-  // Benachrichtigungsberechtigung prüfen
+  // Benachrichtigungsberechtigung prüfen (nur Web, native hat eigenen Dialog)
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
+    if (!isNativeApp() && 'Notification' in window && Notification.permission === 'default') {
       // Kurz warten dann anzeigen
       const timer = setTimeout(() => setShowPermissionCard(true), 2000)
       return () => clearTimeout(timer)
     }
   }, [])
+
+  // Phase 3B: Auto-Clock Service initialisieren
+  useEffect(() => {
+    if (!user?.id || !sites || sites.length === 0) return
+    if (!settings.backgroundGpsEnabled) return
+
+    autoClockService.setAutoClockHandlers(
+      async (siteId: string) => {
+        // Auto-einstempeln über den Hook
+        selectSite(siteId)
+        await handleStartWork()
+      },
+      async () => {
+        await handleStopWork()
+      }
+    )
+    autoClockService.initialize(sites)
+
+    return () => { autoClockService.stop() }
+  }, [user?.id, sites, settings.backgroundGpsEnabled])
 
   const firstName = user?.profile.full_name.split(' ')[0] || 'Mitarbeiter'
   const pauseMinutes = activeEntry ? activeEntry.pause_minutes : 0
@@ -81,10 +131,16 @@ export function EmployeeDashboard() {
 
   const greeting = () => {
     const hour = new Date().getHours()
-    if (hour < 11) return 'Guten Morgen'
-    if (hour < 14) return 'Guten Tag'
-    if (hour < 17) return 'Guten Nachmittag'
-    return 'Guten Abend'
+    if (hour < 12) return t('greeting_morning')
+    if (hour < 17) return t('greeting_afternoon')
+    return t('greeting_evening')
+  }
+
+  const getTranslatedPlatformName = () => {
+    if (isAndroid()) return t('platform_android')
+    if (isIOS()) return t('platform_ios')
+    if (isPWA()) return t('platform_pwa')
+    return t('platform_web')
   }
 
   return (
@@ -94,9 +150,12 @@ export function EmployeeDashboard() {
       {/* Header */}
       <header className="bg-slate-900 border-b border-slate-800 px-4 py-4 safe-top">
         <div className="flex items-center justify-between max-w-lg mx-auto">
-          <div>
-            <p className="text-sm text-slate-400">{greeting()},</p>
-            <h1 className="text-lg font-bold text-white">{firstName} 👷</h1>
+          <div className="flex items-center gap-3">
+            <img src="/icon-512.png" alt="BauZeit Pro" className="w-10 h-10 rounded-xl shadow-lg" />
+            <div>
+              <p className="text-sm text-slate-400">{greeting()},</p>
+              <h1 className="text-lg font-bold text-white">{firstName} 👷</h1>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -138,6 +197,56 @@ export function EmployeeDashboard() {
             </div>
           )}
 
+          {/* Phase 3: App-Modus + GPS + Notification + Reminder Status-Indikatoren */}
+          <div className="flex flex-wrap gap-2">
+            {/* App-Modus */}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-construction-500/10 text-construction-400">
+              <Wifi size={12} />
+              {getTranslatedPlatformName()}
+            </div>
+            {/* GPS */}
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium ${
+              gpsStatus === 'available' ? 'bg-working/10 text-working' :
+              gpsStatus === 'denied' ? 'bg-stopped/10 text-stopped' :
+              'bg-slate-800 text-slate-500'
+            }`}>
+              <Navigation size={12} />
+              {gpsStatus === 'available' ? t('gps_active') :
+               gpsStatus === 'denied' ? t('gps_blocked') :
+               gpsStatus === 'unavailable' ? t('gps_unavailable') :
+               t('gps_checking')}
+            </div>
+            {/* Notifications */}
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium ${
+              isNativeApp() || ('Notification' in window && Notification.permission === 'granted')
+                ? 'bg-working/10 text-working'
+                : 'bg-slate-800 text-slate-500'
+            }`}>
+              <Bell size={12} />
+              {isNativeApp() || ('Notification' in window && Notification.permission === 'granted')
+                ? t('notif_active')
+                : t('notif_off')}
+            </div>
+            {/* Reminder aktiv/inaktiv */}
+            {activeEntry && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-paused/10 text-paused">
+                <Clock size={12} />
+                {t('notif_reminder')}
+              </div>
+            )}
+          </div>
+
+          {/* Phase 2: GPS-Warnung */}
+          {gpsWarning && (
+            <div className="flex items-center gap-2 p-3 bg-paused/10 border border-paused/30 rounded-2xl text-paused text-sm animate-fade-in">
+              <Navigation size={16} className="flex-shrink-0" />
+              <span>{gpsWarning}</span>
+            </div>
+          )}
+
+          {/* Phase 3B: GPS-Info-Karte */}
+          <GpsInfoCard isActive={settings.backgroundGpsEnabled} />
+
           {/* Fehler-Banner */}
           {error && (
             <div className="flex items-center justify-between gap-3 p-4 bg-stopped/10 border border-stopped/30 rounded-2xl text-stopped text-sm animate-fade-in">
@@ -156,7 +265,7 @@ export function EmployeeDashboard() {
               {activeEntry && (
                 <div className="flex items-center gap-1.5 text-xs text-slate-400">
                   <Clock size={12} />
-                  <span>seit {formatTime(activeEntry.start_time)}</span>
+                  <span>{t('emp_since')} {formatTime(activeEntry.start_time)}</span>
                 </div>
               )}
             </div>
@@ -166,7 +275,7 @@ export function EmployeeDashboard() {
               <div className="text-center py-4">
                 <TimeCounter
                   seconds={workedSeconds}
-                  label={status === 'paused' ? 'Pause' : 'Gearbeitet'}
+                  label={status === 'paused' ? t('emp_pause') : t('emp_worked')}
                   variant={status === 'paused' ? 'paused' : isOvertime ? 'working' : 'working'}
                   size="xl"
                 />
@@ -175,13 +284,13 @@ export function EmployeeDashboard() {
                 <div className="flex justify-center gap-8 mt-4 pt-4 border-t border-slate-700">
                   <MiniTimeDisplay
                     minutes={workedMinutes}
-                    label="Stunden"
+                    label={t('emp_hours')}
                     color="text-working"
                   />
                   <div className="w-px bg-slate-700" />
                   <MiniTimeDisplay
                     minutes={pauseMinutes}
-                    label="Pause"
+                    label={t('emp_pause')}
                     color="text-paused"
                   />
                 </div>
@@ -190,7 +299,32 @@ export function EmployeeDashboard() {
                 {isOvertime && (
                   <div className="mt-4 flex items-center gap-2 justify-center text-stopped text-sm bg-stopped/10 rounded-xl p-3 animate-pulse-slow">
                     <AlertTriangle size={16} />
-                    <span>Arbeitszeit überschritten!</span>
+                    <span>{t('emp_overtime')}</span>
+                  </div>
+                )}
+
+                {/* Phase 3: Pausen-Countdown */}
+                {status === 'paused' && pauseRemaining !== null && (
+                  <div className={`mt-4 flex items-center gap-2 justify-center text-sm rounded-xl p-3 ${
+                    pauseRemaining <= 0
+                      ? 'bg-stopped/15 text-stopped animate-pulse-slow'
+                      : pauseRemaining <= stableSettings.pauseWarningBeforeMinutes * 60
+                        ? 'bg-construction-500/15 text-construction-400'
+                        : 'bg-paused/10 text-paused'
+                  }`}>
+                    {pauseRemaining <= 0 ? (
+                      <>
+                        <AlertTriangle size={16} />
+                        <span className="font-bold">{t('pause_expired')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock size={16} />
+                        <span>
+                          ⏸️ {t('pause_remaining').replace('{min}', String(Math.ceil(pauseRemaining / 60)))}
+                        </span>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -199,7 +333,7 @@ export function EmployeeDashboard() {
                   <div className="flex items-center justify-center gap-1.5 mt-3 text-xs text-slate-500">
                     <MapPin size={12} />
                     {/* BUG-009 Fix: Fallback wenn site-Daten nicht geladen */}
-                    <span>{activeEntry.site?.name || 'Baustelle wird geladen...'}</span>
+                    <span>{activeEntry.site?.name || t('emp_site_loading')}</span>
                   </div>
                 )}
               </div>
@@ -208,8 +342,8 @@ export function EmployeeDashboard() {
                 <div className="w-20 h-20 mx-auto rounded-full bg-slate-700 flex items-center justify-center mb-3">
                   <Clock size={36} className="text-slate-500" />
                 </div>
-                <p className="text-slate-400 font-medium">Bereit für die Arbeit</p>
-                <p className="text-slate-500 text-sm mt-1">Wähle eine Baustelle und drücke Start</p>
+                <p className="text-slate-400 font-medium">{t('emp_ready')}</p>
+                <p className="text-slate-500 text-sm mt-1">{t('emp_choose_site')}</p>
               </div>
             )}
           </div>
@@ -247,7 +381,7 @@ export function EmployeeDashboard() {
                   onClick={handleStartWork}
                   icon={<Play size={28} fill="white" />}
                 >
-                  Arbeit starten
+                  {t('emp_start')}
                 </ButtonPrimary>
               )}
 
@@ -262,7 +396,7 @@ export function EmployeeDashboard() {
                     onClick={handleStartPause}
                     icon={<Pause size={28} />}
                   >
-                    Pause starten
+                    {t('emp_pause_start')}
                   </ButtonPrimary>
                   <ButtonPrimary
                     id="btn-stop-work"
@@ -272,7 +406,7 @@ export function EmployeeDashboard() {
                     onClick={() => setShowStopConfirm(true)}
                     icon={<Square size={24} fill="white" />}
                   >
-                    Arbeit beenden
+                    {t('emp_stop')}
                   </ButtonPrimary>
                 </>
               )}
@@ -288,7 +422,7 @@ export function EmployeeDashboard() {
                     onClick={handleEndPause}
                     icon={<Play size={28} fill="white" />}
                   >
-                    Pause beenden
+                    {t('emp_pause_end')}
                   </ButtonPrimary>
                   <ButtonPrimary
                     id="btn-stop-from-pause"
@@ -298,7 +432,7 @@ export function EmployeeDashboard() {
                     onClick={() => setShowStopConfirm(true)}
                     icon={<Square size={24} fill="white" />}
                   >
-                    Arbeit beenden
+                    {t('emp_stop')}
                   </ButtonPrimary>
                 </>
               )}
@@ -315,8 +449,8 @@ export function EmployeeDashboard() {
                 <Clock size={18} className="text-admin" />
               </div>
               <div>
-                <p className="text-sm font-medium text-white">Meine Stundenzettel</p>
-                <p className="text-xs text-slate-500">Tages-, Wochen- und Monatsansicht</p>
+                <p className="text-sm font-medium text-white">{t('emp_timesheets')}</p>
+                <p className="text-xs text-slate-500">{t('emp_timesheets_sub')}</p>
               </div>
             </div>
             <ChevronRight size={16} className="text-slate-600" />
@@ -333,10 +467,10 @@ export function EmployeeDashboard() {
           setShowStopConfirm(false)
           await handleStopWork()
         }}
-        title="Arbeit beenden?"
-        message={`Du hast ${formatMinutes(workedMinutes)} Stunden gearbeitet. Arbeit wirklich beenden und einreichen?`}
-        confirmLabel="✅ Ja, Feierabend!"
-        cancelLabel="Weiterarbeiten"
+        title={t('emp_stop_confirm_title')}
+        message={t('emp_stop_confirm_msg')}
+        confirmLabel={t('emp_stop_confirm_yes')}
+        cancelLabel={t('emp_stop_confirm_no')}
         variant="warning"
         loading={syncing}
       />
