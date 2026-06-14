@@ -7,6 +7,7 @@ import {
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { useTranslation } from '../i18n/LanguageContext'
 import type { ConstructionSite, Profile } from '../types/database'
 
 interface SiteFormData {
@@ -31,6 +32,7 @@ const defaultForm: SiteFormData = {
 
 export function SitesPage() {
   const { user } = useAuth()
+  const { t } = useTranslation()
   const [sites, setSites] = useState<(ConstructionSite & { manager?: Profile; assignedCount?: number })[]>([])
   const [managers, setManagers] = useState<Profile[]>([])
   const [employees, setEmployees] = useState<Profile[]>([])
@@ -78,7 +80,7 @@ export function SitesPage() {
       setSiteAssignments(assignments)
       setSites((sitesData || []) as (ConstructionSite & { manager?: Profile })[])
     } catch (err) {
-      setError('Daten konnten nicht geladen werden')
+      setError(t('error_load_data'))
     } finally {
       setLoading(false)
     }
@@ -179,15 +181,15 @@ export function SitesPage() {
             <ArrowLeft size={20} />
           </Link>
           <div className="flex-1">
-            <h1 className="text-lg font-bold text-white">Baustellenverwaltung</h1>
-            <p className="text-xs text-slate-500">{sites.length} Baustellen</p>
+            <h1 className="text-lg font-bold text-white">{t('sites_title')}</h1>
+            <p className="text-xs text-slate-500">{sites.length} {t('sites_title')}</p>
           </div>
           <button
             onClick={openCreateForm}
             className="flex items-center gap-2 bg-construction-500 hover:bg-construction-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm transition-all active:scale-95"
           >
             <Plus size={16} />
-            Neu
+            {t('sites_add')}
           </button>
         </div>
       </header>
@@ -229,7 +231,7 @@ export function SitesPage() {
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                         site.active ? 'bg-working/20 text-working' : 'bg-slate-700 text-slate-400'
                       }`}>
-                        {site.active ? 'Aktiv' : 'Inaktiv'}
+                        {site.active ? t('admin_active') : 'Inaktiv'}
                       </span>
                     </div>
                     {site.address && (
@@ -252,14 +254,14 @@ export function SitesPage() {
                       selectedSiteForAssign === site.id ? null : site.id
                     )}
                     className="p-2 text-slate-400 hover:text-admin hover:bg-admin/10 rounded-xl transition-colors"
-                    title="Mitarbeiter zuweisen"
+                    title={t('employees_title')}
                   >
                     <Users size={16} />
                   </button>
                   <button
                     onClick={() => openEditForm(site)}
                     className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-xl transition-colors"
-                    title="Bearbeiten"
+                    title={t('common_edit')}
                   >
                     <Edit2 size={16} />
                   </button>
@@ -321,7 +323,7 @@ export function SitesPage() {
           <div className="w-full max-w-lg bg-slate-800 rounded-3xl border border-slate-700 shadow-2xl animate-slide-up">
             <div className="flex items-center justify-between p-6 pb-0">
               <h2 className="text-xl font-bold text-white">
-                {editingSite ? 'Baustelle bearbeiten' : 'Neue Baustelle'}
+                {editingSite ? 'Baustelle bearbeiten' : t('sites_add')}
               </h2>
               <button onClick={() => setShowForm(false)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-xl">
                 <X size={20} />
@@ -415,7 +417,7 @@ export function SitesPage() {
 
             <div className="p-6 pt-0 flex gap-3">
               <button onClick={() => setShowForm(false)} className="btn-secondary flex-1">
-                Abbrechen
+                {t('common_cancel')}
               </button>
               <button
                 onClick={handleSave}
@@ -423,7 +425,7 @@ export function SitesPage() {
                 className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                {saving ? 'Speichere...' : 'Speichern'}
+                {saving ? 'Speichere...' : t('settings_save')}
               </button>
             </div>
           </div>

@@ -1,5 +1,6 @@
 // Admin-Dashboard: Live-Übersicht aller Mitarbeiter und Stundenzettel
 import React, { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from '../i18n/LanguageContext'
 import {
   Users, Building2, Search,
   LogOut, RefreshCw
@@ -30,6 +31,7 @@ type DateFilter = 'today' | 'week' | 'month' | 'all'
 
 export function AdminDashboard() {
   const { user, logout, isAdmin } = useAuth()
+  const { t } = useTranslation()
 
   const [liveEmployees, setLiveEmployees] = useState<LiveEmployee[]>([])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
@@ -272,7 +274,7 @@ export function AdminDashboard() {
             <img src="/icon-512.png" alt="BauZeit Pro" className="w-10 h-10 rounded-xl shadow-lg" />
             <div>
               <h1 className="text-lg font-bold text-white">
-                {isAdmin ? '⚙️ Admin' : '👷 Bauleiter'}-Dashboard
+                {isAdmin ? `⚙️ ${t('admin_dashboard')}` : `👷 ${t('admin_manager_dashboard')}`}
               </h1>
               <p className="text-xs text-slate-500">{user?.profile.full_name}</p>
             </div>
@@ -282,7 +284,7 @@ export function AdminDashboard() {
               onClick={loadData}
               disabled={refreshing}
               className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
-              aria-label="Aktualisieren"
+              aria-label={t('admin_refresh')}
             >
               <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
             </button>
@@ -312,8 +314,8 @@ export function AdminDashboard() {
           {/* Statistik-Karten */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: 'Aktiv', value: activeCount, color: 'text-working', bg: 'bg-working/10', icon: '🔨' },
-              { label: 'Pause', value: pausedCount, color: 'text-paused', bg: 'bg-paused/10', icon: '⏸️' },
+              { label: t('admin_active'), value: activeCount, color: 'text-working', bg: 'bg-working/10', icon: '🔨' },
+              { label: t('admin_paused'), value: pausedCount, color: 'text-paused', bg: 'bg-paused/10', icon: '⏸️' },
               { label: 'Stop vergessen', value: overtimeCount, color: 'text-stopped', bg: 'bg-stopped/10', icon: '⚠️' },
               { label: 'Stunden heute', value: `${formatMinutes(totalHoursToday)}h`, color: 'text-admin', bg: 'bg-admin/10', icon: '📊' },
             ].map(stat => (
@@ -335,7 +337,7 @@ export function AdminDashboard() {
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              🔴 Live-Übersicht
+              🔴 {t('admin_live')}
             </button>
             <button
               onClick={() => setViewMode('entries')}
@@ -345,7 +347,7 @@ export function AdminDashboard() {
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              📋 Stundenzettel
+              📋 {t('ts_title')}
             </button>
           </div>
 
@@ -357,7 +359,7 @@ export function AdminDashboard() {
                 type="search"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Mitarbeiter oder Baustelle suchen..."
+                placeholder={t('admin_search')}
                 className="input pl-9"
               />
             </div>
@@ -369,10 +371,10 @@ export function AdminDashboard() {
                   onChange={e => setDateFilter(e.target.value as DateFilter)}
                   className="input md:w-40"
                 >
-                  <option value="today">Heute</option>
-                  <option value="week">Diese Woche</option>
-                  <option value="month">Dieser Monat</option>
-                  <option value="all">Alle</option>
+                  <option value="today">{t('admin_today')}</option>
+                  <option value="week">{t('admin_week')}</option>
+                  <option value="month">{t('admin_month')}</option>
+                  <option value="all">{t('admin_all')}</option>
                 </select>
 
                 <select
@@ -380,7 +382,7 @@ export function AdminDashboard() {
                   onChange={e => setSelectedSiteFilter(e.target.value)}
                   className="input md:w-48"
                 >
-                  <option value="all">Alle Baustellen</option>
+                  <option value="all">{t('admin_all_sites')}</option>
                   {sites.map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
@@ -391,12 +393,12 @@ export function AdminDashboard() {
                   onChange={e => setStatusFilter(e.target.value)}
                   className="input md:w-40"
                 >
-                  <option value="all">Alle Status</option>
-                  <option value="open">Offen</option>
-                  <option value="submitted">Eingereicht</option>
-                  <option value="approved">Genehmigt</option>
-                  <option value="corrected">Korrigiert</option>
-                  <option value="rejected">Abgelehnt</option>
+                  <option value="all">{t('admin_all_status')}</option>
+                  <option value="open">{t('entry_open')}</option>
+                  <option value="submitted">{t('entry_submitted')}</option>
+                  <option value="approved">{t('entry_approved')}</option>
+                  <option value="corrected">{t('entry_corrected')}</option>
+                  <option value="rejected">{t('entry_rejected')}</option>
                 </select>
 
                 <ExportButton entries={filteredEntries} />
@@ -416,7 +418,7 @@ export function AdminDashboard() {
               ) : filteredLive.length === 0 ? (
                 <div className="card text-center py-12">
                   <Users size={48} className="mx-auto text-slate-700 mb-3" />
-                  <p className="text-slate-400">Keine Mitarbeiter gefunden</p>
+                  <p className="text-slate-400">{t('admin_no_active')}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

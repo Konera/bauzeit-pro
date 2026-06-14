@@ -1,75 +1,94 @@
 // useNotifications Hook: Notification-Zustand und Berechtigungen
+// FIX: Nutzt mobileNotificationService statt Web-only Notification API
 import { useState, useEffect, useCallback } from 'react'
+import { isNativeApp } from '../utils/platform'
 import {
-  requestNotificationPermission,
-  isNotificationGranted,
-  subscribeToPush,
-  vibrate,
-} from '../services/notificationService'
+  requestNotificationPermission as mobileRequestPermission,
+  testNotification as mobileTestNotification,
+} from '../services/mobileNotificationService'
+import { vibrate } from '../services/notificationService'
 
 export function useNotifications(userId?: string) {
-  const [permission, setPermission] = useState<NotificationPermission>(
-    'Notification' in window ? Notification.permission : 'denied'
-  )
-  const [isSubscribed, setIsSubscribed] = useState(false)
+  const [permission, setPermission] = useState<'granted' | 'denied' | 'default'>('default')
   const [loading, setLoading] = useState(false)
 
-  // Berechtigungsstatus prüfen
+  // Berechtigungsstatus beim Mount prüfen
   useEffect(() => {
-    if ('Notification' in window) {
-      setPermission(Notification.permission)
+    async function checkPermission() {
+      if (isNativeApp()) {
+        // Capacitor: Local Notifications prüfen
+        try {
+          const { LocalNotifications } = await import('@capacitor/local-notifications')
+          const status = await LocalNotifications.checkPermissions()
+          if (status.display === 'granted') setPermission('granted')
+          else if (status.display === 'denied') setPermission('denied')
+          else setPermission('default')
+        } catch {
+          // Plugin nicht verfügbar → default lassen
+          setPermission('default')
+        }
+      } else {
+        // Web: Browser Notification API
+        if ('Notification' in window) {
+          setPermission(Notification.permission)
+        } else {
+          setPermission('denied')
+        }
+      }
     }
+
+    checkPermission()
   }, [])
 
-  // Berechtigung anfordern
+  // Berechtigung anfordern (nutzt mobileNotificationService für Native + Web)
   const requestPermission = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await requestNotificationPermission()
-      setPermission(result)
-
-      if (result === 'granted' && userId) {
-        const subscription = await subscribeToPush(userId)
-        setIsSubscribed(!!subscription)
-      }
+      const result = await mobileRequestPermission()
+      // Mapping: mobileNotificationService gibt 'granted' | 'denied' | 'prompt' zurück
+      if (result === 'granted') setPermission('granted')
+      else if (result === 'denied') setPermission('denied')
+      else setPermission('default')
+    } catch {
+      // Fehler → Status beibehalten
     } finally {
       setLoading(false)
     }
-  }, [userId])
+  }, [])
 
   // Vibration testen
   const testVibration = useCallback(() => {
     vibrate([200, 100, 200, 100, 400])
   }, [])
 
-  // Benachrichtigung testen
+  // Test-Notification senden
   const testNotification = useCallback(async () => {
-    if (!isNotificationGranted()) {
+    if (permission !== 'granted') {
       await requestPermission()
       return
     }
-
-    if ('serviceWorker' in navigator) {
-      const reg = await navigator.serviceWorker.ready
-      await reg.showNotification('BauZeit Pro Test', {
-        body: 'Notifications funktionieren korrekt! 🎉',
-        icon: '/icon-192.png',
-      } as NotificationOptions)
+    try {
+      await mobileTestNotification()
+    } catch {
+      // Non-blocking
     }
-  }, [requestPermission])
+  }, [permission, requestPermission])
+
+  // Plattform-Checks
+  const supportsNotifications = isNativeApp() || ('Notification' in window)
+  const supportsVibration = isNativeApp() || ('vibrate' in navigator)
 
   return {
     permission,
     isGranted: permission === 'granted',
     isDenied: permission === 'denied',
     isPending: permission === 'default',
-    isSubscribed,
     loading,
     requestPermission,
     testVibration,
     testNotification,
-    supportsNotifications: 'Notification' in window,
-    supportsVibration: 'vibrate' in navigator,
-    supportsPush: 'PushManager' in window,
+    supportsNotifications,
+    supportsVibration,
+    supportsPush: isNativeApp() || ('PushManager' in window),
   }
 }

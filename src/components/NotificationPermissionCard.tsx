@@ -1,7 +1,9 @@
 // NotificationPermissionCard: Aufforderung zur Notification-Erlaubnis
+// FIX: Alle Strings über t() übersetzt + Capacitor-kompatibel
 import React from 'react'
 import { Bell, BellOff, Check, Smartphone } from 'lucide-react'
 import { useNotifications } from '../hooks/useNotifications'
+import { useTranslation } from '../i18n/LanguageContext'
 
 interface NotificationPermissionCardProps {
   userId?: string
@@ -12,6 +14,7 @@ export function NotificationPermissionCard({
   userId,
   compact = false,
 }: NotificationPermissionCardProps) {
+  const { t } = useTranslation()
   const {
     permission,
     isGranted,
@@ -28,20 +31,20 @@ export function NotificationPermissionCard({
     return (
       <div className="flex items-center gap-2 text-working text-sm p-3 bg-working/10 rounded-xl border border-working/20">
         <Check size={16} />
-        <span>Push-Benachrichtigungen aktiv</span>
+        <span>{t('notif_push_active')}</span>
       </div>
     )
   }
 
-  // Browser unterstützt keine Notifications
+  // Gerät unterstützt keine Notifications
   if (!supportsNotifications) {
     return (
       <div className="card border-slate-600">
         <div className="flex items-center gap-3 text-slate-400">
           <BellOff size={20} />
           <div>
-            <p className="text-sm font-medium">Benachrichtigungen nicht verfügbar</p>
-            <p className="text-xs text-slate-500">Dein Browser unterstützt keine Push-Notifications</p>
+            <p className="text-sm font-medium">{t('notif_unavailable')}</p>
+            <p className="text-xs text-slate-500">{t('notif_unsupported')}</p>
           </div>
         </div>
       </div>
@@ -62,14 +65,14 @@ export function NotificationPermissionCard({
         </div>
         <div>
           <h3 className="font-semibold text-white">
-            {isGranted ? 'Benachrichtigungen aktiv' : 'Benachrichtigungen aktivieren'}
+            {isGranted ? t('notif_active') : t('notif_activate')}
           </h3>
           <p className="text-sm text-slate-400 mt-1">
             {isGranted
-              ? 'Du wirst erinnert, wenn du vergisst auszustempeln.'
+              ? t('notif_reminder_text')
               : isDenied
-              ? 'Berechtigung wurde abgelehnt. Bitte in den Browser-Einstellungen aktivieren.'
-              : 'Erhalte Erinnerungen wenn du vergisst auszustempeln.'}
+              ? t('notif_denied_text')
+              : t('notif_enable_text')}
           </p>
         </div>
       </div>
@@ -82,7 +85,7 @@ export function NotificationPermissionCard({
             disabled={loading}
             className="btn-primary py-3 text-sm"
           >
-            {loading ? 'Bitte warten...' : '🔔 Benachrichtigungen erlauben'}
+            {loading ? t('notif_please_wait') : `🔔 ${t('notif_allow_btn')}`}
           </button>
         )}
 
@@ -92,13 +95,13 @@ export function NotificationPermissionCard({
             className="btn-secondary py-2.5 text-sm flex items-center justify-center gap-2"
           >
             <Smartphone size={16} />
-            Vibration testen
+            {t('notif_vibration_test')}
           </button>
         )}
 
         {isDenied && (
           <div className="text-xs text-slate-500 p-3 bg-slate-900 rounded-xl">
-            <strong className="text-slate-400">Anleitung:</strong> Einstellungen → Browser → Benachrichtigungen → Diese Website → Erlauben
+            <strong className="text-slate-400">💡</strong> {t('notif_denied_hint')}
           </div>
         )}
       </div>

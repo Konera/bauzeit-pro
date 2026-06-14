@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useTranslation } from '../i18n/LanguageContext'
 import type { Profile, UserRole } from '../types/database'
 
 interface EmployeeFormData {
@@ -33,6 +34,7 @@ const roleConfig = {
 }
 
 export function EmployeesPage() {
+  const { t } = useTranslation()
   const [employees, setEmployees] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -52,7 +54,7 @@ export function EmployeesPage() {
       if (err) throw err
       setEmployees(data || [])
     } catch (err) {
-      setError('Daten konnten nicht geladen werden')
+      setError(t('error_load_data'))
     } finally {
       setLoading(false)
     }
@@ -144,7 +146,7 @@ export function EmployeesPage() {
             <ArrowLeft size={20} />
           </Link>
           <div className="flex-1">
-            <h1 className="text-lg font-bold text-white">Mitarbeiterverwaltung</h1>
+            <h1 className="text-lg font-bold text-white">{t('employees_title')}</h1>
             <p className="text-xs text-slate-500">{employees.length} Benutzer</p>
           </div>
           <button
@@ -152,7 +154,7 @@ export function EmployeesPage() {
             className="flex items-center gap-2 bg-construction-500 hover:bg-construction-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm transition-all active:scale-95"
           >
             <Plus size={16} />
-            Neu
+            {t('employees_add')}
           </button>
         </div>
       </header>
@@ -170,7 +172,7 @@ export function EmployeesPage() {
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              {role === 'all' ? 'Alle' : roleConfig[role].label}
+              {role === 'all' ? t('admin_all') : roleConfig[role].label}
             </button>
           ))}
         </div>
@@ -183,7 +185,7 @@ export function EmployeesPage() {
         ) : filtered.length === 0 ? (
           <div className="card text-center py-12">
             <Users size={48} className="mx-auto text-slate-700 mb-3" />
-            <p className="text-slate-400 font-medium">Keine Mitarbeiter</p>
+            <p className="text-slate-400 font-medium">{t('admin_no_active')}</p>
           </div>
         ) : (
           filtered.map(emp => {
@@ -225,7 +227,7 @@ export function EmployeesPage() {
                   <button
                     onClick={() => openEditForm(emp)}
                     className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-xl transition-colors"
-                    title="Bearbeiten"
+                    title={t('common_edit')}
                   >
                     <Edit2 size={16} />
                   </button>
@@ -261,7 +263,7 @@ export function EmployeesPage() {
           <div className="w-full max-w-md bg-slate-800 rounded-3xl border border-slate-700 shadow-2xl animate-slide-up">
             <div className="flex items-center justify-between p-6 pb-0">
               <h2 className="text-xl font-bold text-white">
-                {editingEmployee ? 'Mitarbeiter bearbeiten' : 'Neuer Mitarbeiter'}
+                {editingEmployee ? 'Mitarbeiter bearbeiten' : t('employees_add')}
               </h2>
               <button onClick={() => setShowForm(false)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-xl">
                 <X size={20} />
@@ -335,7 +337,7 @@ export function EmployeesPage() {
 
             <div className="p-6 pt-0 flex gap-3">
               <button onClick={() => setShowForm(false)} className="btn-secondary flex-1">
-                Abbrechen
+                {t('common_cancel')}
               </button>
               <button
                 onClick={handleSave}
@@ -343,7 +345,7 @@ export function EmployeesPage() {
                 className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                {saving ? 'Speichere...' : 'Speichern'}
+                {saving ? 'Speichere...' : t('settings_save')}
               </button>
             </div>
           </div>
