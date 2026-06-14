@@ -25,40 +25,74 @@ async function getCapacitorGeolocation() {
  * - Nativ: Capacitor Geolocation Plugin (hohe Genauigkeit)
  * - Web: navigator.geolocation (Browser API)
  * Gibt null zurück bei jedem Fehler – blockiert nie.
+ * H-FIX: Fordert GPS-Berechtigung auf Native automatisch an.
  */
 export async function getCurrentPosition(): Promise<GeoPosition | null> {
   try {
-    if (isNativeApp()) {
-      const Geolocation = await getCapacitorGeolocation()
-      const pos = await Geolocation.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: 3000,  // 3s statt 10s — GPS darf Stop/Start nie blockieren
-      })
-      return {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        accuracy: pos.coords.accuracy,
-      }
-    }
-
-    // Web-Fallback
-    if (!navigator.geolocation) return null
-
-    return new Promise<GeoPosition | null>((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        }),
-        () => resolve(null),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-      )
-    })
+    // Hard Timeout: GPS darf MAXIMAL 5 Sekunden blockieren
+    const result = await Promise.race([
+      _getCurrentPositionInternal(),
+      new Promise<null>((resolve) => setTimeout(() => {
+        console.warn('GPS: Hard-Timeout nach 5s erreicht')
+        resolve(null)
+      }, 5000)),
+    ])
+    return result
   } catch (error) {
     console.warn('GPS-Position konnte nicht ermittelt werden:', error)
     return null
   }
+}
+
+async function _getCurrentPositionInternal(): Promise<GeoPosition | null> {
+  if (isNativeApp()) {
+    const Geolocation = await getCapacitorGeolocation()
+
+    // Berechtigung prüfen und ggf. anfordern BEVOR wir Position holen
+    try {
+      const permStatus = await Geolocation.checkPermissions()
+      if (permStatus.location === 'denied') {
+        console.warn('GPS: Berechtigung verweigert')
+        return null
+      }
+      if (permStatus.location !== 'granted') {
+        // Berechtigung anfordern (zeigt System-Dialog)
+        const reqResult = await Geolocation.requestPermissions()
+        if (reqResult.location !== 'granted') {
+          console.warn('GPS: Berechtigung nicht erteilt')
+          return null
+        }
+      }
+    } catch (permErr) {
+      console.warn('GPS: Permission-Check fehlgeschlagen, versuche trotzdem:', permErr)
+    }
+
+    // Position holen (mit kurzem Timeout)
+    const pos = await Geolocation.getCurrentPosition({
+      enableHighAccuracy: true,
+      timeout: 3000,
+    })
+    return {
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      accuracy: pos.coords.accuracy,
+    }
+  }
+
+  // Web-Fallback
+  if (!navigator.geolocation) return null
+
+  return new Promise<GeoPosition | null>((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+      }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    )
+  })
 }
 
 // =========================================
