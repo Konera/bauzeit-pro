@@ -291,8 +291,57 @@ export const translations = {
     emp_cancel: 'Abbrechen',
 
     // === Common (erweitert) ===
-    common_save: 'Speichern',
-    common_search: 'Suchen',
+    common_please_wait: 'Bitte warten...',
+    common_name_required: 'Name ist Pflichtfeld',
+    common_save_failed: 'Speichern fehlgeschlagen',
+    common_activate: 'Aktivieren',
+    common_deactivate: 'Deaktivieren',
+    common_all_employees: 'Alle Mitarbeiter',
+
+    // === Admin Dashboard ===
+    admin_overtime_label: 'Stop vergessen',
+    admin_hours_today: 'Stunden heute',
+    admin_approve_failed: 'Genehmigung fehlgeschlagen',
+    admin_correct_comment_required: 'Ein Kommentar ist bei Korrekturen Pflicht.',
+    admin_correct_failed: 'Korrektur fehlgeschlagen',
+    admin_reject_failed: 'Ablehnung fehlgeschlagen',
+    admin_approved_by: 'Genehmigt',
+    admin_rejected_by: 'Abgelehnt',
+    status_working_label: 'Arbeitet',
+    status_paused_label: 'Pause',
+    status_ended: 'Beendet',
+    status_active: 'Aktiv',
+
+    // === Offline Banner ===
+    offline_message: 'Offline – Daten werden lokal gespeichert',
+    offline_synced: 'Daten erfolgreich synchronisiert!',
+
+    // === Sites Page ===
+    sites_manager: 'Bauleiter',
+    sites_no_address: 'Keine Adresse hinterlegt',
+
+    // === Settings Platform Info ===
+    settings_push_label: 'Push-Benachrichtigungen',
+    settings_vibration_label: 'Vibration / Haptics',
+    settings_camera_label: 'Kamera (vorbereitet)',
+    settings_gps_test: 'GPS testen',
+    settings_gps_searching: 'Suche...',
+
+    // === Notifications ===
+    notif_pause_over: 'Deine Pause ist vorbei. Bitte zurück an die Arbeit!',
+    notif_forgot_clock_in: 'Vergiss nicht dich einzustempeln!',
+    notif_want_clock_in: 'Möchtest du dich einstempeln?',
+
+    // === Export ===
+    export_button: 'Exportieren',
+    export_pdf_loading: 'PDF...',
+    export_csv_loading: 'CSV...',
+
+    // === Employees Page ===
+    emp_supabase_hint: 'Neue Mitarbeiter müssen über das Supabase-Dashboard angelegt werden.',
+    role_admin: 'Administrator',
+    role_manager: 'Bauleiter',
+    role_employee: 'Mitarbeiter',
 
     // === Employees ===
     employees_title: 'Mitarbeiter',
@@ -578,8 +627,57 @@ export const translations = {
     emp_cancel: 'Cancel',
 
     // === Common (extended) ===
-    common_save: 'Save',
-    common_search: 'Search',
+    common_please_wait: 'Please wait...',
+    common_name_required: 'Name is required',
+    common_save_failed: 'Save failed',
+    common_activate: 'Activate',
+    common_deactivate: 'Deactivate',
+    common_all_employees: 'All Employees',
+
+    // === Admin Dashboard ===
+    admin_overtime_label: 'Forgot to stop',
+    admin_hours_today: 'Hours today',
+    admin_approve_failed: 'Approval failed',
+    admin_correct_comment_required: 'A comment is required for corrections.',
+    admin_correct_failed: 'Correction failed',
+    admin_reject_failed: 'Rejection failed',
+    admin_approved_by: 'Approved',
+    admin_rejected_by: 'Rejected',
+    status_working_label: 'Working',
+    status_paused_label: 'Paused',
+    status_ended: 'Ended',
+    status_active: 'Active',
+
+    // === Offline Banner ===
+    offline_message: 'Offline – Data saved locally',
+    offline_synced: 'Data synced successfully!',
+
+    // === Sites Page ===
+    sites_manager: 'Site Manager',
+    sites_no_address: 'No address provided',
+
+    // === Settings Platform Info ===
+    settings_push_label: 'Push Notifications',
+    settings_vibration_label: 'Vibration / Haptics',
+    settings_camera_label: 'Camera (prepared)',
+    settings_gps_test: 'Test GPS',
+    settings_gps_searching: 'Searching...',
+
+    // === Notifications ===
+    notif_pause_over: 'Your break is over. Please return to work!',
+    notif_forgot_clock_in: 'Don\'t forget to clock in!',
+    notif_want_clock_in: 'Would you like to clock in?',
+
+    // === Export ===
+    export_button: 'Export',
+    export_pdf_loading: 'PDF...',
+    export_csv_loading: 'CSV...',
+
+    // === Employees Page ===
+    emp_supabase_hint: 'New employees must be created via the Supabase dashboard.',
+    role_admin: 'Administrator',
+    role_manager: 'Site Manager',
+    role_employee: 'Employee',
 
     // === Employees ===
     employees_title: 'Employees',
@@ -865,8 +963,57 @@ export const translations = {
     emp_cancel: 'Отмена',
 
     // === Common (расширенный) ===
-    common_save: 'Сохранить',
-    common_search: 'Поиск',
+    common_please_wait: 'Пожалуйста, подождите...',
+    common_name_required: 'Имя обязательно',
+    common_save_failed: 'Ошибка сохранения',
+    common_activate: 'Активировать',
+    common_deactivate: 'Деактивировать',
+    common_all_employees: 'Все сотрудники',
+
+    // === Admin Dashboard ===
+    admin_overtime_label: 'Забыли остановить',
+    admin_hours_today: 'Часы сегодня',
+    admin_approve_failed: 'Ошибка одобрения',
+    admin_correct_comment_required: 'Комментарий обязателен для исправлений.',
+    admin_correct_failed: 'Ошибка исправления',
+    admin_reject_failed: 'Ошибка отклонения',
+    admin_approved_by: 'Одобрено',
+    admin_rejected_by: 'Отклонено',
+    status_working_label: 'Работает',
+    status_paused_label: 'Пауза',
+    status_ended: 'Завершено',
+    status_active: 'Активен',
+
+    // === Offline Banner ===
+    offline_message: 'Офлайн — данные сохранены локально',
+    offline_synced: 'Данные успешно синхронизированы!',
+
+    // === Sites Page ===
+    sites_manager: 'Прораб',
+    sites_no_address: 'Адрес не указан',
+
+    // === Settings Platform Info ===
+    settings_push_label: 'Push-уведомления',
+    settings_vibration_label: 'Вибрация / Тактильная связь',
+    settings_camera_label: 'Камера (подготовлено)',
+    settings_gps_test: 'Тест GPS',
+    settings_gps_searching: 'Поиск...',
+
+    // === Notifications ===
+    notif_pause_over: 'Ваш перерыв окончен. Пожалуйста, вернитесь к работе!',
+    notif_forgot_clock_in: 'Не забудьте отметиться!',
+    notif_want_clock_in: 'Хотите отметиться?',
+
+    // === Export ===
+    export_button: 'Экспорт',
+    export_pdf_loading: 'PDF...',
+    export_csv_loading: 'CSV...',
+
+    // === Employees Page ===
+    emp_supabase_hint: 'Новых сотрудников нужно создавать через панель Supabase.',
+    role_admin: 'Администратор',
+    role_manager: 'Прораб',
+    role_employee: 'Сотрудник',
 
     // === Employees ===
     employees_title: 'Сотрудники',

@@ -3,8 +3,10 @@ import React, { useState, useEffect } from 'react'
 import { Wifi, WifiOff, RefreshCw, CheckCircle } from 'lucide-react'
 import { clsx } from 'clsx'
 import { offlineSyncService } from '../services/offlineSyncService'
+import { useTranslation } from '../i18n/LanguageContext'
 
 export function OfflineStatusBanner() {
+  const { t } = useTranslation()
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [pendingCount, setPendingCount] = useState(0)
   const [justSynced, setJustSynced] = useState(false)
@@ -88,9 +90,9 @@ export function OfflineStatusBanner() {
         )}
         <span>
           {!isOnline
-            ? 'Offline – Daten werden lokal gespeichert'
+            ? t('offline_message')
             : justSynced
-            ? 'Daten erfolgreich synchronisiert!'
+            ? t('offline_synced')
             : `${pendingCount} Einträge warten auf Sync`}
         </span>
       </div>

@@ -2,6 +2,7 @@
 import React, { useEffect, useRef } from 'react'
 import { X, AlertTriangle } from 'lucide-react'
 import { clsx } from 'clsx'
+import { useTranslation } from '../i18n/LanguageContext'
 
 interface ConfirmModalProps {
   isOpen: boolean
@@ -22,12 +23,13 @@ export function ConfirmModal({
   onConfirm,
   title,
   message,
-  confirmLabel = 'Bestätigen',
-  cancelLabel = 'Abbrechen',
+  confirmLabel,
+  cancelLabel,
   variant = 'danger',
   loading = false,
   children,
 }: ConfirmModalProps) {
+  const { t } = useTranslation()
   const modalRef = useRef<HTMLDivElement>(null)
 
   // Escape zum Schließen
@@ -121,14 +123,14 @@ export function ConfirmModal({
               colors.button
             )}
           >
-            {loading ? 'Bitte warten...' : confirmLabel}
+            {loading ? t('common_please_wait') : (confirmLabel || t('common_confirm'))}
           </button>
           <button
             onClick={onClose}
             disabled={loading}
             className="w-full py-4 px-6 rounded-2xl font-bold text-lg bg-slate-700 hover:bg-slate-600 text-white transition-all duration-150 active:scale-[0.97] disabled:opacity-50"
           >
-            {cancelLabel}
+            {cancelLabel || t('common_cancel')}
           </button>
         </div>
       </div>

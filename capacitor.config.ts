@@ -27,11 +27,6 @@ const config: CapacitorConfig = {
       sound: 'default',
     },
 
-    // Push Notifications
-    PushNotifications: {
-      presentationOptions: ['badge', 'sound', 'alert'],
-    },
-
     // Haptics: Keine spezielle Konfiguration nötig
   },
 

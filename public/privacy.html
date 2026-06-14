@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Datenschutzerklärung — BauZeit Pro</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+      line-height: 1.7;
+      color: #1e293b;
+      background: #ffffff;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { color: #e2e8f0; background: #0f172a; }
+      a { color: #f97316; }
+    }
+    h1 { color: #f97316; font-size: 1.75rem; border-bottom: 2px solid #f97316; padding-bottom: 0.5rem; }
+    h2 { color: #334155; margin-top: 2rem; }
+    @media (prefers-color-scheme: dark) { h2 { color: #94a3b8; } }
+    ul { padding-left: 1.5rem; }
+    .updated { color: #64748b; font-size: 0.875rem; }
+  </style>
+</head>
+<body>
+  <h1>🏗️ BauZeit Pro — Datenschutzerklärung</h1>
+  <p class="updated">Letzte Aktualisierung: 14. Juni 2026</p>
+
+  <h2>1. Verantwortlicher</h2>
+  <p>
+    <strong>Konera</strong><br>
+    E-Mail: info@konera.de
+  </p>
+
+  <h2>2. Welche Daten wir erheben</h2>
+  <p>BauZeit Pro erfasst folgende Daten zur digitalen Arbeitszeiterfassung:</p>
+  <ul>
+    <li><strong>Anmeldedaten:</strong> E-Mail-Adresse und Passwort (verschlüsselt gespeichert)</li>
+    <li><strong>Profildaten:</strong> Vollständiger Name, Telefonnummer (optional), Rolle (Mitarbeiter/Bauleiter/Admin)</li>
+    <li><strong>Arbeitszeitdaten:</strong> Startzeit, Endzeit, Pausenzeiten, zugewiesene Baustelle</li>
+    <li><strong>GPS-Standortdaten:</strong> Breiten- und Längengrad beim Ein-/Ausstempeln (nur bei erteilter Berechtigung)</li>
+    <li><strong>Geräteinformationen:</strong> Plattform (Android/iOS/Web), App-Version</li>
+  </ul>
+
+  <h2>3. Zweck der Datenverarbeitung</h2>
+  <ul>
+    <li>Digitale Erfassung und Verwaltung von Arbeitszeiten</li>
+    <li>Zuordnung von Arbeitszeiten zu Baustellen</li>
+    <li>GPS-basierte Verifizierung des Arbeitsortes (Geofencing)</li>
+    <li>Überstunden-Erkennung und Erinnerungen</li>
+    <li>Export von Stundenzetteln (CSV/PDF)</li>
+  </ul>
+
+  <h2>4. GPS-Standortdaten</h2>
+  <p>
+    Die App erfragt die GPS-Berechtigung <strong>nur</strong> wenn der Nutzer die Zeiterfassung startet oder beendet.
+    Der Standort wird <strong>einmalig</strong> zum Zeitpunkt des Ein-/Ausstempelns erfasst — 
+    <strong>kein kontinuierliches Tracking</strong>.
+  </p>
+  <p>GPS-Daten werden verwendet um:</p>
+  <ul>
+    <li>Die Anwesenheit auf der zugewiesenen Baustelle zu verifizieren</li>
+    <li>Die Entfernung zur Baustelle zu berechnen</li>
+    <li>GPS-Warnungen anzuzeigen wenn der Standort nicht mit der Baustelle übereinstimmt</li>
+  </ul>
+  <p>Der Nutzer kann die GPS-Funktion jederzeit in den App-Einstellungen deaktivieren.</p>
+
+  <h2>5. Datenspeicherung</h2>
+  <p>
+    Alle Daten werden auf Servern von <strong>Supabase</strong> (Region: EU — Frankfurt am Main) gespeichert.
+    Die Übertragung erfolgt ausschließlich über <strong>HTTPS</strong> (TLS 1.3).
+  </p>
+  <p>Lokale Daten (Einstellungen, Offline-Daten) werden im Gerätespeicher (localStorage/IndexedDB) gespeichert und verlassen das Gerät nur bei der Synchronisierung.</p>
+
+  <h2>6. Datenweitergabe</h2>
+  <p>Personenbezogene Daten werden <strong>nicht</strong> an Dritte weitergegeben, verkauft oder für Werbezwecke verwendet.</p>
+  <p>Daten sind nur für den jeweiligen Arbeitgeber (Admin/Bauleiter des Unternehmens) einsehbar.</p>
+
+  <h2>7. Datensicherheit</h2>
+  <ul>
+    <li>Passwörter werden mit bcrypt gehasht (niemals im Klartext gespeichert)</li>
+    <li>Alle API-Kommunikation über HTTPS</li>
+    <li>Row-Level Security (RLS) in der Datenbank — jeder Nutzer sieht nur seine eigenen Daten</li>
+    <li>Session-basierte Authentifizierung mit automatischem Token-Refresh</li>
+  </ul>
+
+  <h2>8. Ihre Rechte (DSGVO)</h2>
+  <p>Sie haben das Recht auf:</p>
+  <ul>
+    <li><strong>Auskunft</strong> über Ihre gespeicherten Daten</li>
+    <li><strong>Berichtigung</strong> unrichtiger Daten</li>
+    <li><strong>Löschung</strong> Ihrer Daten ("Recht auf Vergessenwerden")</li>
+    <li><strong>Datenübertragbarkeit</strong> (Export als CSV/PDF)</li>
+    <li><strong>Widerspruch</strong> gegen die Verarbeitung</li>
+  </ul>
+  <p>Kontaktieren Sie uns unter <strong>info@konera.de</strong> um Ihre Rechte auszuüben.</p>
+
+  <h2>9. Änderungen</h2>
+  <p>Wir behalten uns vor, diese Datenschutzerklärung anzupassen. Die aktuelle Version ist stets unter dieser URL verfügbar.</p>
+
+  <hr>
+
+  <!-- English Version -->
+  <h1>🏗️ BauZeit Pro — Privacy Policy</h1>
+  <p class="updated">Last updated: June 14, 2026</p>
+
+  <h2>1. Controller</h2>
+  <p><strong>Konera</strong><br>Email: info@konera.de</p>
+
+  <h2>2. Data We Collect</h2>
+  <ul>
+    <li><strong>Login data:</strong> Email address and password (stored encrypted)</li>
+    <li><strong>Profile data:</strong> Full name, phone number (optional), role</li>
+    <li><strong>Time tracking data:</strong> Start/end times, break times, assigned construction site</li>
+    <li><strong>GPS location:</strong> Latitude and longitude when clocking in/out (only with permission)</li>
+    <li><strong>Device info:</strong> Platform (Android/iOS/Web), app version</li>
+  </ul>
+
+  <h2>3. Purpose</h2>
+  <ul>
+    <li>Digital time tracking and management for construction sites</li>
+    <li>GPS-based workplace verification</li>
+    <li>Overtime detection and reminders</li>
+    <li>Timesheet export (CSV/PDF)</li>
+  </ul>
+
+  <h2>4. GPS Data</h2>
+  <p>The app requests GPS permission <strong>only</strong> when clocking in or out. Location is captured <strong>once</strong> — no continuous tracking. GPS can be disabled in app settings.</p>
+
+  <h2>5. Data Storage</h2>
+  <p>All data is stored on <strong>Supabase</strong> servers (EU — Frankfurt, Germany) and transmitted via <strong>HTTPS</strong> only.</p>
+
+  <h2>6. Data Sharing</h2>
+  <p>Personal data is <strong>never</strong> shared with, sold to, or used for advertising by third parties. Data is only accessible to the respective employer (admin/manager).</p>
+
+  <h2>7. Your Rights (GDPR)</h2>
+  <p>You have the right to access, rectify, delete, and port your data. Contact us at <strong>info@konera.de</strong>.</p>
+</body>
+</html>

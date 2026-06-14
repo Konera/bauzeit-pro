@@ -27,14 +27,20 @@ const defaultForm: EmployeeFormData = {
   password: '',
 }
 
-const roleConfig = {
-  admin: { label: 'Administrator', icon: Shield, color: 'text-stopped', bg: 'bg-stopped/20' },
-  manager: { label: 'Bauleiter', icon: HardHat, color: 'text-admin', bg: 'bg-admin/20' },
-  employee: { label: 'Mitarbeiter', icon: User, color: 'text-slate-300', bg: 'bg-slate-700' },
+// roleConfig wird dynamisch mit t() befüllt — Labels werden im Component gesetzt
+const roleIcons = {
+  admin: { icon: Shield, color: 'text-stopped', bg: 'bg-stopped/20' },
+  manager: { icon: HardHat, color: 'text-admin', bg: 'bg-admin/20' },
+  employee: { icon: User, color: 'text-slate-300', bg: 'bg-slate-700' },
 }
 
 export function EmployeesPage() {
   const { t } = useTranslation()
+  const roleConfig = {
+    admin: { label: t('role_admin'), ...roleIcons.admin },
+    manager: { label: t('role_manager'), ...roleIcons.manager },
+    employee: { label: t('role_employee'), ...roleIcons.employee },
+  }
   const [employees, setEmployees] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -83,7 +89,7 @@ export function EmployeesPage() {
 
   const handleSave = async () => {
     if (!form.full_name.trim()) {
-      setError('Name ist Pflichtfeld')
+      setError(t('common_name_required'))
       return
     }
     setSaving(true)
@@ -113,7 +119,7 @@ export function EmployeesPage() {
         }
 
         // Hinweis: In Produktion via Supabase Admin Edge Function
-        setError('Neue Mitarbeiter müssen über das Supabase-Dashboard oder Edge Functions angelegt werden. Bitte nutze die Supabase-UI für die Erstanlage.')
+        setError(t('emp_supabase_hint'))
         setSaving(false)
         return
       }
@@ -121,7 +127,7 @@ export function EmployeesPage() {
       setShowForm(false)
       await loadData()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen')
+      setError(err instanceof Error ? err.message : t('common_save_failed'))
     } finally {
       setSaving(false)
     }
@@ -238,7 +244,7 @@ export function EmployeesPage() {
                         ? 'text-working hover:bg-working/10'
                         : 'text-slate-500 hover:bg-slate-700'
                     }`}
-                    title={emp.active ? 'Deaktivieren' : 'Aktivieren'}
+                    title={emp.active ? t('common_deactivate') : t('common_activate')}
                   >
                     {emp.active ? <Power size={16} /> : <PowerOff size={16} />}
                   </button>
