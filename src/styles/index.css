@@ -344,14 +344,20 @@
     position: relative;
     display: inline-flex;
     align-items: center;
-    width: 48px;
-    height: 28px;
+    width: 52px;
+    height: 32px;
+    min-width: 52px;
+    min-height: 32px;
     border-radius: 9999px;
     cursor: pointer;
     transition: background-color 0.2s ease;
     background-color: #475569;
     flex-shrink: 0;
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    border: none;
+    outline: none;
+    padding: 0;
   }
   .toggle-switch[data-active="true"] {
     background-color: var(--color-construction-500);
@@ -359,12 +365,13 @@
   .toggle-switch .toggle-thumb {
     position: absolute;
     left: 3px;
-    width: 22px;
-    height: 22px;
+    width: 26px;
+    height: 26px;
     border-radius: 9999px;
     background-color: #ffffff;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     transition: left 0.2s ease;
+    pointer-events: none;
   }
   .toggle-switch[data-active="true"] .toggle-thumb {
     left: 23px;

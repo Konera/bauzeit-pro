@@ -77,7 +77,12 @@ export function SettingsPage() {
   }
 
   const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
-    setSettings(prev => ({ ...prev, [key]: value }))
+    setSettings(prev => {
+      const updated = { ...prev, [key]: value }
+      // AUTO-SAVE: Sofort speichern bei jeder Änderung (nicht auf Save-Button warten)
+      saveSettings(updated)
+      return updated
+    })
   }
 
   const backTo = isAdminOrManager ? '/admin' : '/dashboard'
