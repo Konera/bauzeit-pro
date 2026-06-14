@@ -78,22 +78,36 @@ export function useTimeTracking(
   const activeEntryRef = useRef<TimeEntry | null>(null)
   const currentBreakRef = useRef<BreakEntry | null>(null)
 
-  // Phase 2/3: GPS-Status beim Mount prüfen (über locationService)
+  // Phase 2/3: GPS-Status beim Mount prüfen + Samsung: Berechtigung proaktiv anfordern
   useEffect(() => {
     async function checkGps() {
       try {
-        // Timeout: GPS-Check darf maximal 3 Sekunden dauern
+        // Timeout: GPS-Check darf maximal 5 Sekunden dauern
         const status = await Promise.race([
           locationService.checkLocationPermission(),
-          new Promise<'unavailable'>((resolve) => setTimeout(() => resolve('unavailable'), 3000)),
+          new Promise<'unavailable'>((resolve) => setTimeout(() => resolve('unavailable'), 5000)),
         ])
-        setState(prev => ({
-          ...prev,
-          gpsStatus: status === 'granted' ? 'available'
-            : status === 'denied' ? 'denied'
-            : status === 'unavailable' ? 'unavailable'
-            : 'available', // 'prompt' = GPS verfügbar, noch nicht erfragt
-        }))
+
+        if (status === 'granted') {
+          setState(prev => ({ ...prev, gpsStatus: 'available' }))
+        } else if (status === 'denied') {
+          setState(prev => ({ ...prev, gpsStatus: 'denied' }))
+        } else {
+          // 'prompt' oder 'unavailable' → Berechtigung proaktiv anfordern
+          // Samsung zeigt den Dialog erst bei requestPermissions()
+          try {
+            const reqResult = await Promise.race([
+              locationService.requestLocationPermission(),
+              new Promise<'denied'>((resolve) => setTimeout(() => resolve('denied'), 5000)),
+            ])
+            setState(prev => ({
+              ...prev,
+              gpsStatus: reqResult === 'granted' ? 'available' : 'denied',
+            }))
+          } catch {
+            setState(prev => ({ ...prev, gpsStatus: 'unavailable' }))
+          }
+        }
       } catch {
         // GPS-Check fehlgeschlagen → nicht blockieren
         setState(prev => ({ ...prev, gpsStatus: 'unavailable' }))

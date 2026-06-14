@@ -51,31 +51,67 @@ async function _getCurrentPositionInternal(): Promise<GeoPosition | null> {
     // Berechtigung prüfen und ggf. anfordern BEVOR wir Position holen
     try {
       const permStatus = await Geolocation.checkPermissions()
+      console.log('GPS Permission Status:', permStatus.location)
       if (permStatus.location === 'denied') {
-        console.warn('GPS: Berechtigung verweigert')
-        return null
+        // Samsung: Nochmal versuchen — manchmal ist 'denied' nur 'not asked yet'
+        try {
+          const reqResult = await Geolocation.requestPermissions()
+          console.log('GPS Permission nach Request:', reqResult.location)
+          if (reqResult.location === 'denied') {
+            console.warn('GPS: Berechtigung endgültig verweigert')
+            return null
+          }
+        } catch {
+          console.warn('GPS: requestPermissions fehlgeschlagen')
+          return null
+        }
       }
       if (permStatus.location !== 'granted') {
-        // Berechtigung anfordern (zeigt System-Dialog)
-        const reqResult = await Geolocation.requestPermissions()
-        if (reqResult.location !== 'granted') {
-          console.warn('GPS: Berechtigung nicht erteilt')
-          return null
+        // 'prompt' oder anderer Status → Berechtigung anfordern
+        try {
+          const reqResult = await Geolocation.requestPermissions()
+          console.log('GPS Permission nach Request:', reqResult.location)
+          if (reqResult.location !== 'granted') {
+            console.warn('GPS: Berechtigung nicht erteilt')
+            return null
+          }
+        } catch {
+          console.warn('GPS: requestPermissions fehlgeschlagen')
+          // Trotzdem versuchen — manche Samsung-Geräte werfen hier aber GPS geht trotzdem
         }
       }
     } catch (permErr) {
       console.warn('GPS: Permission-Check fehlgeschlagen, versuche trotzdem:', permErr)
     }
 
-    // Position holen (mit kurzem Timeout)
-    const pos = await Geolocation.getCurrentPosition({
-      enableHighAccuracy: true,
-      timeout: 3000,
-    })
-    return {
-      lat: pos.coords.latitude,
-      lng: pos.coords.longitude,
-      accuracy: pos.coords.accuracy,
+    // Position holen — Samsung Fix: Erst High-Accuracy, dann Fallback auf Low-Accuracy
+    try {
+      const pos = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 3000,
+      })
+      return {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+      }
+    } catch (highAccErr) {
+      console.warn('GPS: High-Accuracy fehlgeschlagen, versuche Low-Accuracy:', highAccErr)
+      // Samsung: Nutzer hat evtl. nur "ungefähren Standort" erlaubt
+      try {
+        const pos = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: false,
+          timeout: 3000,
+        })
+        return {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        }
+      } catch (lowAccErr) {
+        console.warn('GPS: Auch Low-Accuracy fehlgeschlagen:', lowAccErr)
+        return null
+      }
     }
   }
 
