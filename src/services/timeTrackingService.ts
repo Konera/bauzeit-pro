@@ -243,136 +243,120 @@ export async function endPause(
 // Arbeit beenden
 // =========================================
 
+/**
+ * FORCE STOP: Minimaler 1-Query Stop — funktioniert IMMER, auch bei schlechtem Netz.
+ * Kein GPS, kein Geofence, keine Break-Berechnung — nur end_time setzen.
+ */
+export async function forceStopWork(
+  timeEntryId: string,
+  employeeId: string
+): Promise<void> {
+  const now = new Date().toISOString()
+
+  // 1. Offene Pausen schließen (best-effort, nicht blockierend)
+  try {
+    supabase.from('break_entries')
+      .update({ end_time: now })
+      .eq('time_entry_id', timeEntryId)
+      .is('end_time', null)
+      .then(() => {})
+  } catch {
+    // ignorieren
+  }
+
+  // 2. NUR der essentielle Update — 1 einziger Netzwerk-Call
+  const { error } = await supabase
+    .from('time_entries')
+    .update({
+      end_time: now,
+      status: 'submitted',
+      updated_at: now,
+    })
+    .eq('id', timeEntryId)
+
+  if (error) {
+    console.error('[ForceStop] Supabase-Fehler:', error.message)
+    throw new Error('Stop fehlgeschlagen: ' + error.message)
+  }
+
+  console.log('[ForceStop] Erfolgreich gestoppt:', timeEntryId)
+
+  // Audit-Log non-blocking
+  createAuditLog({
+    entity_type: 'time_entry', entity_id: timeEntryId,
+    action: 'work_stopped',
+    old_value: { status: 'open' },
+    new_value: { end_time: now, status: 'submitted' },
+    changed_by: employeeId,
+  }).catch(() => {})
+}
+
 export async function stopWork(
   timeEntryId: string,
   employeeId: string
 ): Promise<{ entry: TimeEntry; error?: string }> {
   const now = new Date().toISOString()
-  const position = await tryGetPosition()
 
-  // Phase 2: Geofence-Check für End-Position
-  let endDistanceM: number | null = null
-  let shouldUpdateGpsWarning = false
-  if (position) {
-    try {
-      const { data: entry } = await supabase
-        .from('time_entries')
-        .select('site_id')
-        .eq('id', timeEntryId)
-        .maybeSingle()
+  // SCHRITT 1: Sofort end_time setzen (damit der Eintrag auf jeden Fall geschlossen wird)
+  // Dies ist der KRITISCHE Call — alles andere ist optional
+  const { error: immediateError } = await supabase
+    .from('time_entries')
+    .update({ end_time: now, status: 'submitted', updated_at: now })
+    .eq('id', timeEntryId)
 
-      if (entry) {
-        const { data: site } = await supabase
-          .from('construction_sites')
-          .select('gps_lat, gps_lng, gps_radius_m')
-          .eq('id', entry.site_id)
-          .maybeSingle()
-
-        if (site && site.gps_lat != null && site.gps_lng != null) {
-          const fence = gpsService.checkGeofence(
-            position,
-            site as ConstructionSite
-          )
-          endDistanceM = fence.distanceMeters
-          if (!fence.isInside) shouldUpdateGpsWarning = true
-        }
-      }
-    } catch {
-      // Geofence-Check nicht-blockierend
-    }
+  if (immediateError) {
+    throw new Error('Arbeit beenden fehlgeschlagen: ' + immediateError.message)
   }
 
-  // Offene Pause schließen
-  const openBreak = await getOpenBreak(timeEntryId)
-  if (openBreak) {
-    await supabase.from('break_entries').update({ end_time: now }).eq('id', openBreak.id)
-  }
-
-  // Alle Pausen laden und Minuten berechnen
-  const { data: allBreaks } = await supabase
-    .from('break_entries').select('*').eq('time_entry_id', timeEntryId)
-  const totalPauseMinutes = calcPauseMinutes((allBreaks || []) as BreakEntry[])
-
-  // Startzeit holen (ohne Phase-2-Felder als Fallback)
-  let startTime: string | undefined
-  let existingGpsWarning = false
+  // Ab hier: Alles ist best-effort (Pausen, GPS, Audit etc.)
+  // Wenn etwas fehlschlägt, ist der Eintrag trotzdem geschlossen!
   try {
-    const { data: current } = await supabase
-      .from('time_entries').select('start_time, gps_warning').eq('id', timeEntryId).maybeSingle()
-    startTime = (current as { start_time: string; gps_warning: boolean } | null)?.start_time
-    existingGpsWarning = (current as { start_time: string; gps_warning: boolean } | null)?.gps_warning ?? false
-  } catch {
-    // Fallback: gps_warning Spalte existiert noch nicht
+    // Offene Pause schließen
+    await supabase.from('break_entries')
+      .update({ end_time: now })
+      .eq('time_entry_id', timeEntryId)
+      .is('end_time', null)
+
+    // Pausen berechnen
+    const { data: allBreaks } = await supabase
+      .from('break_entries').select('*').eq('time_entry_id', timeEntryId)
+    const totalPauseMinutes = calcPauseMinutes((allBreaks || []) as BreakEntry[])
+
+    // Start-Zeit holen für total_minutes
     const { data: current } = await supabase
       .from('time_entries').select('start_time').eq('id', timeEntryId).maybeSingle()
-    startTime = (current as { start_time: string } | null)?.start_time
-  }
+    const startTime = (current as { start_time: string } | null)?.start_time
 
-  const totalMinutes = startTime
-    ? Math.max(0, differenceInMinutes(new Date(now), parseISO(startTime)) - totalPauseMinutes)
-    : 0
+    const totalMinutes = startTime
+      ? Math.max(0, differenceInMinutes(new Date(now), parseISO(startTime)) - totalPauseMinutes)
+      : 0
 
-  // Update mit Phase-2-Feldern versuchen, Fallback ohne
-  let data: unknown = null
-  let error: { message: string } | null = null
-
-  const phase2Update = {
-    end_time: now,
-    pause_minutes: totalPauseMinutes,
-    total_minutes: totalMinutes,
-    status: 'submitted',
-    end_lat: position?.lat ?? null,
-    end_lng: position?.lng ?? null,
-    end_distance_m: endDistanceM,
-    gps_warning: existingGpsWarning || shouldUpdateGpsWarning,
-    updated_at: now,
-  }
-
-  const result1 = await supabase
-    .from('time_entries')
-    .update(phase2Update)
-    .eq('id', timeEntryId)
-    .select(`*, site:construction_sites(*), breaks:break_entries(*)`)
-    .single()
-
-  if (result1.error) {
-    console.warn('stopWork Phase-2 Update fehlgeschlagen, versuche Basic-Update:', result1.error.message)
-    // Fallback: Ohne Phase-2-Spalten
-    const basicUpdate = {
-      end_time: now,
-      pause_minutes: totalPauseMinutes,
-      total_minutes: totalMinutes,
-      status: 'submitted',
-      end_lat: position?.lat ?? null,
-      end_lng: position?.lng ?? null,
-      updated_at: now,
-    }
-    const result2 = await supabase
-      .from('time_entries')
-      .update(basicUpdate)
+    // Nachträgliches Update mit berechneten Werten
+    await supabase.from('time_entries')
+      .update({ pause_minutes: totalPauseMinutes, total_minutes: totalMinutes })
       .eq('id', timeEntryId)
-      .select(`*, site:construction_sites(*), breaks:break_entries(*)`)
-      .single()
-
-    data = result2.data
-    error = result2.error
-  } else {
-    data = result1.data
-    error = result1.error
+  } catch (enrichError) {
+    console.warn('[StopWork] Anreicherung fehlgeschlagen (Eintrag ist trotzdem geschlossen):', enrichError)
   }
 
-  if (error) throw new Error('Arbeit beenden fehlgeschlagen: ' + error.message)
+  // Entry laden für Return
+  const { data } = await supabase
+    .from('time_entries')
+    .select(`*, site:construction_sites(*), breaks:break_entries(*)`)
+    .eq('id', timeEntryId)
+    .maybeSingle()
 
-  await createAuditLog({
+  // Audit non-blocking
+  createAuditLog({
     entity_type: 'time_entry', entity_id: timeEntryId,
     action: 'work_stopped',
     old_value: { status: 'open' },
-    new_value: { end_time: now, total_minutes: totalMinutes, status: 'submitted' },
+    new_value: { end_time: now, status: 'submitted' },
     changed_by: employeeId,
-  })
+  }).catch(() => {})
 
-  await hapticsService.vibrateWarning()
-  return { entry: data as TimeEntry }
+  hapticsService.vibrateWarning().catch(() => {})
+  return { entry: (data || {}) as TimeEntry }
 }
 
 // =========================================

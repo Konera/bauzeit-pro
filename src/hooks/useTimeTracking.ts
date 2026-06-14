@@ -13,6 +13,7 @@ import {
   startPause,
   endPause,
   stopWork,
+  forceStopWork,
   getSiteAssignments,
 } from '../services/timeTrackingService'
 import { mobileNotificationService } from '../services/mobileNotificationService'
@@ -418,49 +419,31 @@ export function useTimeTracking(
 
   const handleStopWork = useCallback(async () => {
     if (!employeeId || !state.activeEntry) return
+    const entryId = state.activeEntry.id
 
-    setState(prev => ({ ...prev, syncing: true, error: null }))
+    // UI sofort zurücksetzen — NICHT auf Netzwerk warten
+    mobileNotificationService.cancelWorkReminder().catch(() => {})
+    stopTimer()
+    activeEntryRef.current = null
+    currentBreakRef.current = null
 
-    // Timeout: Maximal 10 Sekunden, danach Force-Reset
-    const timeoutId = setTimeout(() => {
-      console.error('[StopWork] Timeout nach 10s — Force-Reset')
-      setState(prev => ({
-        ...prev,
-        syncing: false,
-        error: 'Zeitüberschreitung. Bitte erneut versuchen.',
-      }))
-    }, 10000)
+    setState(prev => ({
+      ...prev,
+      activeEntry: null,
+      currentBreak: null,
+      status: 'not_started',
+      workedSeconds: 0,
+      pausedSeconds: 0,
+      syncing: false,
+    }))
 
+    // Netzwerk-Call im Hintergrund — UI ist bereits zurückgesetzt
     try {
-      await stopWork(state.activeEntry.id, employeeId)
-
-      clearTimeout(timeoutId)
-
-      // NON-BLOCKING
-      mobileNotificationService.cancelWorkReminder().catch(() => {})
-      stopTimer()
-
-      // Refs clearen
-      activeEntryRef.current = null
-      currentBreakRef.current = null
-
-      setState(prev => ({
-        ...prev,
-        activeEntry: null,
-        currentBreak: null,
-        status: 'not_started',
-        workedSeconds: 0,
-        pausedSeconds: 0,
-        syncing: false,
-      }))
+      await forceStopWork(entryId, employeeId)
+      console.log('[StopWork] Erfolgreich')
     } catch (error) {
-      clearTimeout(timeoutId)
-      console.error('[StopWork] Fehler:', error)
-      setState(prev => ({
-        ...prev,
-        syncing: false,
-        error: error instanceof Error ? error.message : 'Arbeit beenden fehlgeschlagen',
-      }))
+      console.error('[StopWork] Hintergrund-Fehler (UI bereits zurückgesetzt):', error)
+      // Eintrag trotzdem als gestoppt anzeigen — beim nächsten Laden wird es korrigiert
     }
   }, [employeeId, state.activeEntry, stopTimer])
 
