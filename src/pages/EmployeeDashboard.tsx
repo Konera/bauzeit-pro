@@ -84,17 +84,35 @@ export function EmployeeDashboard() {
     return () => clearInterval(interval)
   }, [status, currentBreak, stableSettings.maxPauseMinutes])
   const [isOvertime, setIsOvertime] = useState(false)
+  const autoStopTriggeredRef = React.useRef(false)
 
-  // Überstunden prüfen
+  // Überstunden prüfen + Auto-Stop
   useEffect(() => {
     if (activeEntry) {
-      const limit = settings.maxWorkHours || 8
+      const limit = settings.maxWorkHours || 10
       const overtime = isOverTimeLimit(activeEntry.start_time, limit)
       setIsOvertime(overtime)
+
+      // Auto-Stop: Wenn Überstunden UND Auto-Stop aktiviert → automatisch beenden
+      // Sicherheitsgrenze: Maximal 12 Stunden, danach IMMER stoppen
+      const hardLimit = 12
+      const isHardOvertime = isOverTimeLimit(activeEntry.start_time, hardLimit)
+      const autoStopEnabled = settings.autoStopEnabled !== false // Standard: aktiviert
+
+      if ((overtime && autoStopEnabled) || isHardOvertime) {
+        if (!autoStopTriggeredRef.current) {
+          autoStopTriggeredRef.current = true
+          console.warn('[AutoStop] Arbeitszeit überschritten, automatischer Stop', {
+            limit, hardLimit, isHardOvertime, autoStopEnabled
+          })
+          handleStopWork()
+        }
+      }
     } else {
       setIsOvertime(false)
+      autoStopTriggeredRef.current = false
     }
-  }, [activeEntry, workedSeconds, settings.maxWorkHours])
+  }, [activeEntry, workedSeconds, settings.maxWorkHours, settings.autoStopEnabled, handleStopWork])
 
   // Benachrichtigungsberechtigung prüfen (nur Web, native hat eigenen Dialog)
   useEffect(() => {

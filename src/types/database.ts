@@ -170,6 +170,7 @@ export interface AppSettings {
   geofenceAutoClockOut: boolean      // Auto-Ausstempeln bei Baustellen-Verlassen
   geofenceNotifyOnly: boolean        // Nur Notification statt Auto-Stempel
   motionDetectionEnabled: boolean    // Losfahrt-Erkennung
+  autoStopEnabled: boolean            // Auto-Stop nach maxWorkHours
 }
 
 // GPS Position

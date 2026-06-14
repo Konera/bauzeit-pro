@@ -39,6 +39,7 @@ const defaultSettings: AppSettings = {
   geofenceAutoClockOut: true,
   geofenceNotifyOnly: true,   // Standard: Nur Notification (sicher)
   motionDetectionEnabled: true,
+  autoStopEnabled: true,       // Standard: Auto-Stop aktiviert
 }
 
 function getSettings(): AppSettings {
@@ -137,8 +138,20 @@ export function SettingsPage() {
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Warnung erscheint nach {settings.maxWorkHours} Stunden Arbeitszeit
+                Arbeit wird nach {settings.maxWorkHours} Stunden automatisch beendet
               </p>
+            </div>
+
+            {/* Auto-Stop Toggle */}
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-white font-medium text-sm">Automatischer Stop</p>
+                <p className="text-xs text-slate-500">Arbeit nach {settings.maxWorkHours}h automatisch beenden</p>
+              </div>
+              <ToggleSwitch
+                active={settings.autoStopEnabled !== false}
+                onToggle={() => updateSetting('autoStopEnabled', !(settings.autoStopEnabled !== false))}
+              />
             </div>
 
             <div>

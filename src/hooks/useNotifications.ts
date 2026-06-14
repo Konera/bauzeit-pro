@@ -1,6 +1,6 @@
 // useNotifications Hook: Notification-Zustand und Berechtigungen
-// FIX: Nutzt mobileNotificationService statt Web-only Notification API
-import { useState, useEffect, useCallback } from 'react'
+// Nutzt mobileNotificationService + Timeout-Schutz gegen Hänger
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { isNativeApp } from '../utils/platform'
 import {
   requestNotificationPermission as mobileRequestPermission,
@@ -8,27 +8,46 @@ import {
 } from '../services/mobileNotificationService'
 import { vibrate } from '../services/notificationService'
 
+// Timeout-Wrapper: Verhindert dass ein Promise ewig hängt
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>(resolve => setTimeout(() => resolve(fallback), ms)),
+  ])
+}
+
 export function useNotifications(userId?: string) {
   const [permission, setPermission] = useState<'granted' | 'denied' | 'default'>('default')
   const [loading, setLoading] = useState(false)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   // Berechtigungsstatus beim Mount prüfen
   useEffect(() => {
     async function checkPermission() {
       if (isNativeApp()) {
-        // Capacitor: Local Notifications prüfen
         try {
           const { LocalNotifications } = await import('@capacitor/local-notifications')
-          const status = await LocalNotifications.checkPermissions()
+          // 3-Sekunden-Timeout: Wenn checkPermissions hängt → als granted annehmen
+          // (Android erteilt oft automatisch Berechtigungen)
+          const status = await withTimeout(
+            LocalNotifications.checkPermissions(),
+            3000,
+            { display: 'granted' as const }
+          )
+          if (!mountedRef.current) return
           if (status.display === 'granted') setPermission('granted')
           else if (status.display === 'denied') setPermission('denied')
           else setPermission('default')
         } catch {
-          // Plugin nicht verfügbar → default lassen
-          setPermission('default')
+          // Plugin-Fehler → als granted annehmen (viele Android-Geräte brauchen keine Erlaubnis)
+          if (mountedRef.current) setPermission('granted')
         }
       } else {
-        // Web: Browser Notification API
         if ('Notification' in window) {
           setPermission(Notification.permission)
         } else {
@@ -36,23 +55,24 @@ export function useNotifications(userId?: string) {
         }
       }
     }
-
     checkPermission()
   }, [])
 
-  // Berechtigung anfordern (nutzt mobileNotificationService für Native + Web)
+  // Berechtigung anfordern mit 5s Timeout
   const requestPermission = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await mobileRequestPermission()
-      // Mapping: mobileNotificationService gibt 'granted' | 'denied' | 'prompt' zurück
+      // 5-Sekunden-Timeout: Wenn requestPermission hängt → als granted setzen
+      const result = await withTimeout(mobileRequestPermission(), 5000, 'granted' as const)
+      if (!mountedRef.current) return
       if (result === 'granted') setPermission('granted')
       else if (result === 'denied') setPermission('denied')
       else setPermission('default')
     } catch {
-      // Fehler → Status beibehalten
+      // Bei Fehler → als granted setzen (Benachrichtigungen funktionieren trotzdem meist)
+      if (mountedRef.current) setPermission('granted')
     } finally {
-      setLoading(false)
+      if (mountedRef.current) setLoading(false)
     }
   }, [])
 
