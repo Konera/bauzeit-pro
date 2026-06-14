@@ -39,3 +39,5 @@ ios/App/build/
 *.jks
 google-services.json
 GoogleService-Info.plist
+*.keystore
+*.jks
