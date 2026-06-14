@@ -17,6 +17,7 @@ import type { AppSettings } from '../types/database'
 import { workStartReminderService } from '../services/workStartReminderService'
 import { backgroundGeofenceService } from '../services/backgroundGeofenceService'
 import { NotificationTestCenter } from '../components/NotificationTestCenter'
+import { ToggleSwitch } from '../components/ToggleSwitch'
 
 const defaultSettings: AppSettings = {
   maxWorkHours: 8,
@@ -212,16 +213,10 @@ export function SettingsPage() {
                 <p className="text-white font-medium text-sm">{t('pause_auto_end')}</p>
                 <p className="text-xs text-slate-500">{t('pause_auto_end_sub')}</p>
               </div>
-              <button
-                onClick={() => updateSetting('autoPauseEnd', !settings.autoPauseEnd)}
-                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
-                  settings.autoPauseEnd ? 'bg-construction-500' : 'bg-slate-600'
-                }`}
-              >
-                <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
-                  settings.autoPauseEnd ? 'translate-x-6' : 'translate-x-1'
-                }`} />
-              </button>
+              <ToggleSwitch
+                active={settings.autoPauseEnd}
+                onToggle={() => updateSetting('autoPauseEnd', !settings.autoPauseEnd)}
+              />
             </div>
           </div>
         </section>
@@ -238,8 +233,9 @@ export function SettingsPage() {
                 <p className="text-white font-medium text-sm">{t('work_start_reminder')}</p>
                 <p className="text-xs text-slate-500">{t('work_start_reminder_sub')}</p>
               </div>
-              <button
-                onClick={() => {
+              <ToggleSwitch
+                active={settings.workStartReminderEnabled}
+                onToggle={() => {
                   const newVal = !settings.workStartReminderEnabled
                   updateSetting('workStartReminderEnabled', newVal)
                   // Erinnerungen sofort aktualisieren
@@ -249,14 +245,7 @@ export function SettingsPage() {
                     enabled: newVal,
                   }).catch(() => {})
                 }}
-                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
-                  settings.workStartReminderEnabled ? 'bg-construction-500' : 'bg-slate-600'
-                }`}
-              >
-                <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
-                  settings.workStartReminderEnabled ? 'translate-x-6' : 'translate-x-1'
-                }`} />
-              </button>
+              />
             </div>
 
             {settings.workStartReminderEnabled && (
@@ -334,16 +323,10 @@ export function SettingsPage() {
                 <p className="text-white font-medium text-sm">{t('gps_background')}</p>
                 <p className="text-xs text-slate-500">{t('gps_background_sub')}</p>
               </div>
-              <button
-                onClick={() => updateSetting('backgroundGpsEnabled', !settings.backgroundGpsEnabled)}
-                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
-                  settings.backgroundGpsEnabled ? 'bg-construction-500' : 'bg-slate-600'
-                }`}
-              >
-                <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
-                  settings.backgroundGpsEnabled ? 'translate-x-6' : 'translate-x-1'
-                }`} />
-              </button>
+              <ToggleSwitch
+                active={settings.backgroundGpsEnabled}
+                onToggle={() => updateSetting('backgroundGpsEnabled', !settings.backgroundGpsEnabled)}
+              />
             </div>
 
             {settings.backgroundGpsEnabled && (
@@ -354,16 +337,10 @@ export function SettingsPage() {
                     <p className="text-white font-medium text-sm">{t('gps_auto_clock_in')}</p>
                     <p className="text-xs text-slate-500">{t('gps_auto_clock_in_sub')}</p>
                   </div>
-                  <button
-                    onClick={() => updateSetting('geofenceAutoClockIn', !settings.geofenceAutoClockIn)}
-                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
-                      settings.geofenceAutoClockIn ? 'bg-construction-500' : 'bg-slate-600'
-                    }`}
-                  >
-                    <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
-                      settings.geofenceAutoClockIn ? 'translate-x-6' : 'translate-x-1'
-                    }`} />
-                  </button>
+                  <ToggleSwitch
+                    active={settings.geofenceAutoClockIn}
+                    onToggle={() => updateSetting('geofenceAutoClockIn', !settings.geofenceAutoClockIn)}
+                  />
                 </div>
 
                 {/* Auto-Ausstempeln */}
@@ -372,16 +349,10 @@ export function SettingsPage() {
                     <p className="text-white font-medium text-sm">{t('gps_auto_clock_out')}</p>
                     <p className="text-xs text-slate-500">{t('gps_auto_clock_out_sub')}</p>
                   </div>
-                  <button
-                    onClick={() => updateSetting('geofenceAutoClockOut', !settings.geofenceAutoClockOut)}
-                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
-                      settings.geofenceAutoClockOut ? 'bg-construction-500' : 'bg-slate-600'
-                    }`}
-                  >
-                    <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
-                      settings.geofenceAutoClockOut ? 'translate-x-6' : 'translate-x-1'
-                    }`} />
-                  </button>
+                  <ToggleSwitch
+                    active={settings.geofenceAutoClockOut}
+                    onToggle={() => updateSetting('geofenceAutoClockOut', !settings.geofenceAutoClockOut)}
+                  />
                 </div>
 
                 {/* Nur Notification */}
@@ -390,16 +361,10 @@ export function SettingsPage() {
                     <p className="text-white font-medium text-sm">{t('gps_notify_only')}</p>
                     <p className="text-xs text-slate-500">{t('gps_notify_only_sub')}</p>
                   </div>
-                  <button
-                    onClick={() => updateSetting('geofenceNotifyOnly', !settings.geofenceNotifyOnly)}
-                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
-                      settings.geofenceNotifyOnly ? 'bg-paused' : 'bg-slate-600'
-                    }`}
-                  >
-                    <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
-                      settings.geofenceNotifyOnly ? 'translate-x-6' : 'translate-x-1'
-                    }`} />
-                  </button>
+                  <ToggleSwitch
+                    active={settings.geofenceNotifyOnly}
+                    onToggle={() => updateSetting('geofenceNotifyOnly', !settings.geofenceNotifyOnly)}
+                  />
                 </div>
 
                 {/* Losfahrt-Erkennung */}
@@ -408,16 +373,10 @@ export function SettingsPage() {
                     <p className="text-white font-medium text-sm">{t('gps_motion')}</p>
                     <p className="text-xs text-slate-500">{t('gps_motion_sub')}</p>
                   </div>
-                  <button
-                    onClick={() => updateSetting('motionDetectionEnabled', !settings.motionDetectionEnabled)}
-                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
-                      settings.motionDetectionEnabled ? 'bg-construction-500' : 'bg-slate-600'
-                    }`}
-                  >
-                    <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
-                      settings.motionDetectionEnabled ? 'translate-x-6' : 'translate-x-1'
-                    }`} />
-                  </button>
+                  <ToggleSwitch
+                    active={settings.motionDetectionEnabled}
+                    onToggle={() => updateSetting('motionDetectionEnabled', !settings.motionDetectionEnabled)}
+                  />
                 </div>
 
                 {/* Modus-Anzeige */}
@@ -453,16 +412,10 @@ export function SettingsPage() {
                 <p className="text-white font-medium text-sm">Push-Benachrichtigungen</p>
                 <p className="text-xs text-slate-500">Erinnerungen wenn du vergisst auszustempeln</p>
               </div>
-              <button
-                onClick={() => updateSetting('pushNotifications', !settings.pushNotifications)}
-                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
-                  settings.pushNotifications ? 'bg-construction-500' : 'bg-slate-600'
-                }`}
-              >
-                <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
-                  settings.pushNotifications ? 'translate-x-6' : 'translate-x-1'
-                }`} />
-              </button>
+              <ToggleSwitch
+                active={settings.pushNotifications}
+                onToggle={() => updateSetting('pushNotifications', !settings.pushNotifications)}
+              />
             </div>
 
             {/* Vibration Toggle */}
@@ -472,16 +425,10 @@ export function SettingsPage() {
                   <p className="text-white font-medium text-sm">Vibration</p>
                   <p className="text-xs text-slate-500">Haptic Feedback bei Aktionen</p>
                 </div>
-                <button
-                  onClick={() => updateSetting('vibration', !settings.vibration)}
-                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
-                    settings.vibration ? 'bg-construction-500' : 'bg-slate-600'
-                  }`}
-                >
-                  <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
-                    settings.vibration ? 'translate-x-6' : 'translate-x-1'
-                  }`} />
-                </button>
+                <ToggleSwitch
+                  active={settings.vibration}
+                  onToggle={() => updateSetting('vibration', !settings.vibration)}
+                />
               </div>
             )}
 

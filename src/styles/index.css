@@ -338,6 +338,37 @@
   .scrollbar-thin::-webkit-scrollbar { width: 4px; }
   .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
   .scrollbar-thin::-webkit-scrollbar-thumb { background: #475569; border-radius: 9999px; }
+
+  /* --- Toggle Switch (Android-sicher) --- */
+  .toggle-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    width: 48px;
+    height: 28px;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    background-color: #475569;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .toggle-switch[data-active="true"] {
+    background-color: var(--color-construction-500);
+  }
+  .toggle-switch .toggle-thumb {
+    position: absolute;
+    left: 3px;
+    width: 22px;
+    height: 22px;
+    border-radius: 9999px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: left 0.2s ease;
+  }
+  .toggle-switch[data-active="true"] .toggle-thumb {
+    left: 23px;
+  }
 }
 
 /* ============================================================
