@@ -417,14 +417,30 @@ export function useTimeTracking(
   }, [employeeId, state.activeEntry, startTimer])
 
   const handleStopWork = useCallback(async () => {
-    if (isSubmittingRef.current) return
+    if (isSubmittingRef.current) {
+      console.warn('[StopWork] Bereits in Bearbeitung, überspringe')
+      return
+    }
     isSubmittingRef.current = true
     if (!employeeId || !state.activeEntry) { isSubmittingRef.current = false; return }
 
     setState(prev => ({ ...prev, syncing: true, error: null }))
 
+    // Timeout-Wrapper: Maximal 15 Sekunden warten, danach Force-Reset
+    const timeoutId = setTimeout(() => {
+      console.error('[StopWork] Timeout nach 15s — Force-Reset')
+      isSubmittingRef.current = false
+      setState(prev => ({
+        ...prev,
+        syncing: false,
+        error: 'Zeitüberschreitung. Bitte erneut versuchen.',
+      }))
+    }, 15000)
+
     try {
       await stopWork(state.activeEntry.id, employeeId)
+
+      clearTimeout(timeoutId)
 
       // NON-BLOCKING
       mobileNotificationService.cancelWorkReminder().catch(() => {})
@@ -444,6 +460,7 @@ export function useTimeTracking(
         syncing: false,
       }))
     } catch (error) {
+      clearTimeout(timeoutId)
       setState(prev => ({
         ...prev,
         syncing: false,

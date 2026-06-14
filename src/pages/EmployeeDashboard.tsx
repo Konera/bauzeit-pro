@@ -85,6 +85,8 @@ export function EmployeeDashboard() {
   }, [status, currentBreak, stableSettings.maxPauseMinutes])
   const [isOvertime, setIsOvertime] = useState(false)
   const autoStopTriggeredRef = React.useRef(false)
+  const handleStopWorkRef = React.useRef(handleStopWork)
+  handleStopWorkRef.current = handleStopWork
 
   // Überstunden prüfen + Auto-Stop
   useEffect(() => {
@@ -94,25 +96,23 @@ export function EmployeeDashboard() {
       setIsOvertime(overtime)
 
       // Auto-Stop: Wenn Überstunden UND Auto-Stop aktiviert → automatisch beenden
-      // Sicherheitsgrenze: Maximal 12 Stunden, danach IMMER stoppen
-      const hardLimit = 12
-      const isHardOvertime = isOverTimeLimit(activeEntry.start_time, hardLimit)
-      const autoStopEnabled = settings.autoStopEnabled !== false // Standard: aktiviert
-
-      if ((overtime && autoStopEnabled) || isHardOvertime) {
-        if (!autoStopTriggeredRef.current) {
-          autoStopTriggeredRef.current = true
-          console.warn('[AutoStop] Arbeitszeit überschritten, automatischer Stop', {
-            limit, hardLimit, isHardOvertime, autoStopEnabled
-          })
-          handleStopWork()
-        }
+      const autoStopEnabled = settings.autoStopEnabled !== false
+      if (overtime && autoStopEnabled && !autoStopTriggeredRef.current) {
+        autoStopTriggeredRef.current = true
+        console.warn('[AutoStop] Arbeitszeit überschritten, automatischer Stop')
+        // Fire-and-forget — NICHT awaiten, damit UI nicht blockiert
+        handleStopWorkRef.current().catch(() => {
+          // Bei Fehler: Flag zurücksetzen damit es erneut versucht werden kann
+          autoStopTriggeredRef.current = false
+        })
       }
     } else {
       setIsOvertime(false)
       autoStopTriggeredRef.current = false
     }
-  }, [activeEntry, workedSeconds, settings.maxWorkHours, settings.autoStopEnabled, handleStopWork])
+    // WICHTIG: handleStopWork NICHT in deps — sonst Dauerschleife!
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEntry, workedSeconds, settings.maxWorkHours, settings.autoStopEnabled])
 
   // Benachrichtigungsberechtigung prüfen (nur Web, native hat eigenen Dialog)
   useEffect(() => {

@@ -32,7 +32,7 @@ export async function getCurrentPosition(): Promise<GeoPosition | null> {
       const Geolocation = await getCapacitorGeolocation()
       const pos = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: 3000,  // 3s statt 10s — GPS darf Stop/Start nie blockieren
       })
       return {
         lat: pos.coords.latitude,
