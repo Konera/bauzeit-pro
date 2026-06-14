@@ -417,25 +417,19 @@ export function useTimeTracking(
   }, [employeeId, state.activeEntry, startTimer])
 
   const handleStopWork = useCallback(async () => {
-    if (isSubmittingRef.current) {
-      console.warn('[StopWork] Bereits in Bearbeitung, überspringe')
-      return
-    }
-    isSubmittingRef.current = true
-    if (!employeeId || !state.activeEntry) { isSubmittingRef.current = false; return }
+    if (!employeeId || !state.activeEntry) return
 
     setState(prev => ({ ...prev, syncing: true, error: null }))
 
-    // Timeout-Wrapper: Maximal 15 Sekunden warten, danach Force-Reset
+    // Timeout: Maximal 10 Sekunden, danach Force-Reset
     const timeoutId = setTimeout(() => {
-      console.error('[StopWork] Timeout nach 15s — Force-Reset')
-      isSubmittingRef.current = false
+      console.error('[StopWork] Timeout nach 10s — Force-Reset')
       setState(prev => ({
         ...prev,
         syncing: false,
         error: 'Zeitüberschreitung. Bitte erneut versuchen.',
       }))
-    }, 15000)
+    }, 10000)
 
     try {
       await stopWork(state.activeEntry.id, employeeId)
@@ -461,13 +455,12 @@ export function useTimeTracking(
       }))
     } catch (error) {
       clearTimeout(timeoutId)
+      console.error('[StopWork] Fehler:', error)
       setState(prev => ({
         ...prev,
         syncing: false,
         error: error instanceof Error ? error.message : 'Arbeit beenden fehlgeschlagen',
       }))
-    } finally {
-      isSubmittingRef.current = false
     }
   }, [employeeId, state.activeEntry, stopTimer])
 

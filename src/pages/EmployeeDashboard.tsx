@@ -84,35 +84,16 @@ export function EmployeeDashboard() {
     return () => clearInterval(interval)
   }, [status, currentBreak, stableSettings.maxPauseMinutes])
   const [isOvertime, setIsOvertime] = useState(false)
-  const autoStopTriggeredRef = React.useRef(false)
-  const handleStopWorkRef = React.useRef(handleStopWork)
-  handleStopWorkRef.current = handleStopWork
 
-  // Überstunden prüfen + Auto-Stop
+  // Überstunden prüfen (nur Warnung, KEIN Auto-Stop — verursacht Button-Blockade)
   useEffect(() => {
     if (activeEntry) {
       const limit = settings.maxWorkHours || 10
-      const overtime = isOverTimeLimit(activeEntry.start_time, limit)
-      setIsOvertime(overtime)
-
-      // Auto-Stop: Wenn Überstunden UND Auto-Stop aktiviert → automatisch beenden
-      const autoStopEnabled = settings.autoStopEnabled !== false
-      if (overtime && autoStopEnabled && !autoStopTriggeredRef.current) {
-        autoStopTriggeredRef.current = true
-        console.warn('[AutoStop] Arbeitszeit überschritten, automatischer Stop')
-        // Fire-and-forget — NICHT awaiten, damit UI nicht blockiert
-        handleStopWorkRef.current().catch(() => {
-          // Bei Fehler: Flag zurücksetzen damit es erneut versucht werden kann
-          autoStopTriggeredRef.current = false
-        })
-      }
+      setIsOvertime(isOverTimeLimit(activeEntry.start_time, limit))
     } else {
       setIsOvertime(false)
-      autoStopTriggeredRef.current = false
     }
-    // WICHTIG: handleStopWork NICHT in deps — sonst Dauerschleife!
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeEntry, workedSeconds, settings.maxWorkHours, settings.autoStopEnabled])
+  }, [activeEntry, workedSeconds, settings.maxWorkHours])
 
   // Benachrichtigungsberechtigung prüfen (nur Web, native hat eigenen Dialog)
   useEffect(() => {
@@ -420,7 +401,6 @@ export function EmployeeDashboard() {
                     id="btn-stop-work"
                     variant="stop"
                     size="lg"
-                    loading={syncing}
                     onClick={() => setShowStopConfirm(true)}
                     icon={<Square size={24} fill="white" />}
                   >
@@ -446,7 +426,6 @@ export function EmployeeDashboard() {
                     id="btn-stop-from-pause"
                     variant="stop"
                     size="lg"
-                    loading={syncing}
                     onClick={() => setShowStopConfirm(true)}
                     icon={<Square size={24} fill="white" />}
                   >
@@ -490,7 +469,6 @@ export function EmployeeDashboard() {
         confirmLabel={t('emp_stop_confirm_yes')}
         cancelLabel={t('emp_stop_confirm_no')}
         variant="warning"
-        loading={syncing}
       />
     </div>
   )
