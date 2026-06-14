@@ -358,6 +358,27 @@ export const translations = {
     // === Employees ===
     employees_title: 'Mitarbeiter',
     employees_add: 'Neuer Mitarbeiter',
+
+    // === CSV Export ===
+    csv_employee: 'Mitarbeiter',
+    csv_site: 'Baustelle',
+    csv_date: 'Datum',
+    csv_start_time: 'Startzeit',
+    csv_end_time: 'Endzeit',
+    csv_pause_minutes: 'Pause (Minuten)',
+    csv_total_hours: 'Gesamtstunden',
+    csv_status: 'Status',
+    csv_gps_start: 'GPS Start',
+    csv_gps_end: 'GPS Ende',
+    csv_gps_warning: 'GPS Warnung',
+    csv_distance_start: 'Entfernung Start (m)',
+    csv_distance_end: 'Entfernung Ende (m)',
+    csv_admin_comment: 'Admin Kommentar',
+    csv_approved_by: 'Genehmigt von',
+    csv_approved_at: 'Genehmigt am',
+    csv_rejection_reason: 'Ablehnungsgrund',
+    csv_yes: 'Ja',
+    csv_no: 'Nein',
   },
 
   en: {
@@ -706,6 +727,27 @@ export const translations = {
     // === Employees ===
     employees_title: 'Employees',
     employees_add: 'New Employee',
+
+    // === CSV Export ===
+    csv_employee: 'Employee',
+    csv_site: 'Site',
+    csv_date: 'Date',
+    csv_start_time: 'Start Time',
+    csv_end_time: 'End Time',
+    csv_pause_minutes: 'Break (Minutes)',
+    csv_total_hours: 'Total Hours',
+    csv_status: 'Status',
+    csv_gps_start: 'GPS Start',
+    csv_gps_end: 'GPS End',
+    csv_gps_warning: 'GPS Warning',
+    csv_distance_start: 'Distance Start (m)',
+    csv_distance_end: 'Distance End (m)',
+    csv_admin_comment: 'Admin Comment',
+    csv_approved_by: 'Approved By',
+    csv_approved_at: 'Approved At',
+    csv_rejection_reason: 'Rejection Reason',
+    csv_yes: 'Yes',
+    csv_no: 'No',
   },
 
   ru: {
@@ -1054,6 +1096,27 @@ export const translations = {
     // === Employees ===
     employees_title: 'Сотрудники',
     employees_add: 'Новый сотрудник',
+
+    // === CSV Export ===
+    csv_employee: 'Сотрудник',
+    csv_site: 'Объект',
+    csv_date: 'Дата',
+    csv_start_time: 'Начало',
+    csv_end_time: 'Конец',
+    csv_pause_minutes: 'Перерыв (мин)',
+    csv_total_hours: 'Всего часов',
+    csv_status: 'Статус',
+    csv_gps_start: 'GPS начало',
+    csv_gps_end: 'GPS конец',
+    csv_gps_warning: 'GPS предупреждение',
+    csv_distance_start: 'Расстояние начало (м)',
+    csv_distance_end: 'Расстояние конец (м)',
+    csv_admin_comment: 'Комментарий админа',
+    csv_approved_by: 'Одобрено',
+    csv_approved_at: 'Дата одобрения',
+    csv_rejection_reason: 'Причина отклонения',
+    csv_yes: 'Да',
+    csv_no: 'Нет',
   },
 } as const
 

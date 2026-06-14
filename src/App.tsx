@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AppRouter } from './app/router'
 import { LanguageProvider } from './i18n/LanguageContext'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 // QueryClient für Datencaching konfigurieren
 const queryClient = new QueryClient({
@@ -18,13 +19,15 @@ const queryClient = new QueryClient({
 
 function App() {
   return (
-    <LanguageProvider>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <AppRouter />
-        </BrowserRouter>
-      </QueryClientProvider>
-    </LanguageProvider>
+    <ErrorBoundary>
+      <LanguageProvider>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            <AppRouter />
+          </BrowserRouter>
+        </QueryClientProvider>
+      </LanguageProvider>
+    </ErrorBoundary>
   )
 }
 

@@ -1,12 +1,19 @@
 // Background Geofence Service – GPS-Polling, Geofence-Monitoring, Bewegungserkennung
-// H4 FIX: Nutzt @capacitor-community/background-geolocation für echtes Background-GPS auf Native
-// Fallback: @capacitor/geolocation mit 30s Intervall im Vordergrund (Web/PWA)
+// Nutzt Foreground-GPS via @capacitor/geolocation mit 30s Intervall
+// Native Background-GPS-Watcher ist vorbereitet, Plugin aber nicht installiert
 
 import { locationService } from './locationService'
 import { gpsService } from './gpsService'
 import type { GeoPosition, ConstructionSite } from '../types/database'
 import { getPlatformInfo } from '../utils/platform'
-import type { BackgroundGeolocationPlugin, Location, CallbackError } from '@capacitor-community/background-geolocation'
+
+// Inline-Typen für den optionalen Background-GPS-Watcher (Plugin nicht installiert)
+interface BackgroundGeolocationPlugin {
+  addWatcher(opts: Record<string, unknown>, cb: (loc: Location | undefined, err: CallbackError | undefined) => void): Promise<string>
+  removeWatcher(opts: { id: string }): Promise<void>
+}
+interface Location { latitude: number; longitude: number; accuracy: number }
+interface CallbackError { code: string }
 
 // =========================================
 // State

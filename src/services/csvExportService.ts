@@ -1,26 +1,43 @@
 // CSV-Export-Service für Admin-Stundenzettel mit allen Phase-2-Feldern
 // Erweitert den Basis-CSV-Export um GPS-Warnung, Entfernung und Genehmigungsfelder
+// Nutzt non-React Translation-Helper für mehrsprachige CSV-Headers
 import Papa from 'papaparse'
 import type { TimeEntry } from '../types/database'
 import { formatDate, formatTime, formatDateTime } from '../utils/timeUtils'
+import { translations } from '../i18n/translations'
+import type { Language } from '../i18n/translations'
 
 // =========================================
-// Status-Übersetzung (Deutsch)
+// Non-React Translation Helper
 // =========================================
 
-const statusMap: Record<string, string> = {
-  open: 'Offen',
-  submitted: 'Eingereicht',
-  approved: 'Genehmigt',
-  corrected: 'Korrigiert',
-  rejected: 'Abgelehnt',
+function getLanguage(): Language {
+  try {
+    return (localStorage.getItem('bauzeit_language') as Language) || 'de'
+  } catch {
+    return 'de'
+  }
 }
 
-/**
- * Übersetzt den internen Status-Schlüssel ins Deutsche
- */
+function t(key: string): string {
+  const lang = getLanguage()
+  const dict = translations[lang] || translations.de
+  return (dict as Record<string, string>)[key] || (translations.de as Record<string, string>)[key] || key
+}
+
+// =========================================
+// Status-Übersetzung
+// =========================================
+
 function translateStatus(status: string): string {
-  return statusMap[status] || status
+  const statusKeyMap: Record<string, string> = {
+    open: 'entry_open',
+    submitted: 'entry_submitted',
+    approved: 'entry_approved',
+    corrected: 'entry_corrected',
+    rejected: 'entry_rejected',
+  }
+  return t(statusKeyMap[status] || status)
 }
 
 // =========================================
@@ -29,10 +46,9 @@ function translateStatus(status: string): string {
 
 /**
  * Formatiert GPS-Koordinaten als lesbaren String
- * Gibt 'Nicht verfügbar' zurück wenn keine Daten vorhanden
  */
 function formatGPS(lat: number | null, lng: number | null): string {
-  if (lat === null || lng === null) return 'Nicht verfügbar'
+  if (lat === null || lng === null) return t('settings_unavailable')
   return `${lat}, ${lng}`
 }
 
@@ -41,27 +57,27 @@ function formatGPS(lat: number | null, lng: number | null): string {
 // =========================================
 
 /**
- * Wandelt einen Zeiteintrag in ein Objekt mit deutschen Spaltenüberschriften um
+ * Wandelt einen Zeiteintrag in ein Objekt mit übersetzten Spaltenüberschriften um
  */
 function mapEntryToRow(entry: TimeEntry): Record<string, string | number> {
   return {
-    'Mitarbeiter': entry.employee?.full_name || '',
-    'Baustelle': entry.site?.name || '',
-    'Datum': formatDate(entry.start_time),
-    'Startzeit': formatTime(entry.start_time),
-    'Endzeit': entry.end_time ? formatTime(entry.end_time) : '',
-    'Pause (Minuten)': entry.pause_minutes,
-    'Gesamtstunden': (entry.total_minutes / 60).toFixed(2),
-    'Status': translateStatus(entry.status),
-    'GPS Start': formatGPS(entry.start_lat, entry.start_lng),
-    'GPS Ende': formatGPS(entry.end_lat, entry.end_lng),
-    'GPS Warnung': entry.gps_warning ? 'Ja' : 'Nein',
-    'Entfernung Start (m)': entry.start_distance_m ?? '',
-    'Entfernung Ende (m)': entry.end_distance_m ?? '',
-    'Admin Kommentar': entry.admin_comment || '',
-    'Genehmigt von': entry.approved_by_profile?.full_name || '',
-    'Genehmigt am': entry.approved_at ? formatDateTime(entry.approved_at) : '',
-    'Ablehnungsgrund': entry.rejected_reason || '',
+    [t('csv_employee')]: entry.employee?.full_name || '',
+    [t('csv_site')]: entry.site?.name || '',
+    [t('csv_date')]: formatDate(entry.start_time),
+    [t('csv_start_time')]: formatTime(entry.start_time),
+    [t('csv_end_time')]: entry.end_time ? formatTime(entry.end_time) : '',
+    [t('csv_pause_minutes')]: entry.pause_minutes,
+    [t('csv_total_hours')]: (entry.total_minutes / 60).toFixed(2),
+    [t('csv_status')]: translateStatus(entry.status),
+    [t('csv_gps_start')]: formatGPS(entry.start_lat, entry.start_lng),
+    [t('csv_gps_end')]: formatGPS(entry.end_lat, entry.end_lng),
+    [t('csv_gps_warning')]: entry.gps_warning ? t('csv_yes') : t('csv_no'),
+    [t('csv_distance_start')]: entry.start_distance_m ?? '',
+    [t('csv_distance_end')]: entry.end_distance_m ?? '',
+    [t('csv_admin_comment')]: entry.admin_comment || '',
+    [t('csv_approved_by')]: entry.approved_by_profile?.full_name || '',
+    [t('csv_approved_at')]: entry.approved_at ? formatDateTime(entry.approved_at) : '',
+    [t('csv_rejection_reason')]: entry.rejected_reason || '',
   }
 }
 
@@ -71,7 +87,6 @@ function mapEntryToRow(entry: TimeEntry): Record<string, string | number> {
 
 /**
  * Erzeugt einen standardisierten Dateinamen mit aktuellem Datum
- * Format: stundenzettel_export_2024-01-15.csv
  */
 function generateFilename(): string {
   const today = new Date().toISOString().split('T')[0]
@@ -122,7 +137,7 @@ export function exportAdminCSV(entries: TimeEntry[], filename?: string): void {
     return
   }
 
-  // Alle Einträge in Zeilenobjekte mit deutschen Spaltenüberschriften umwandeln
+  // Alle Einträge in Zeilenobjekte mit übersetzten Spaltenüberschriften umwandeln
   const rows = entries.map(mapEntryToRow)
 
   // CSV mit Semikolon-Trennzeichen für deutsches Excel erzeugen
