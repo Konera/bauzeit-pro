@@ -143,15 +143,15 @@ export function SettingsPage() {
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Arbeit wird nach {settings.maxWorkHours} Stunden automatisch beendet
+                {t('settings_auto_stop_after')} {settings.maxWorkHours} {t('emp_hours')}
               </p>
             </div>
 
             {/* Auto-Stop Toggle */}
             <div className="flex items-center justify-between py-2">
               <div>
-                <p className="text-white font-medium text-sm">Automatischer Stop</p>
-                <p className="text-xs text-slate-500">Arbeit nach {settings.maxWorkHours}h automatisch beenden</p>
+                <p className="text-white font-medium text-sm">{t('settings_auto_stop')}</p>
+                <p className="text-xs text-slate-500">{t('settings_auto_stop_sub')} {settings.maxWorkHours}h</p>
               </div>
               <ToggleSwitch
                 active={settings.autoStopEnabled !== false}
@@ -176,7 +176,7 @@ export function SettingsPage() {
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Erinnerung wird alle {settings.reminderAfterMinutes} Minuten wiederholt
+                {t('settings_reminder_repeat')} {settings.reminderAfterMinutes} {t('settings_minutes')}
               </p>
             </div>
           </div>
@@ -401,7 +401,7 @@ export function SettingsPage() {
                 <div className="bg-slate-800 rounded-xl p-3 text-xs text-slate-400">
                   <span className="font-semibold text-white">
                     {settings.geofenceNotifyOnly ? '🟡 ' : '🟢 '}
-                    {settings.geofenceNotifyOnly ? t('gps_notify_only') : 'Voll-Auto'}
+                    {settings.geofenceNotifyOnly ? t('gps_notify_only') : t('settings_full_auto')}
                   </span>
                   <span className="ml-1">
                     – {settings.geofenceNotifyOnly
@@ -427,8 +427,8 @@ export function SettingsPage() {
             {/* Push Notifications Toggle */}
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-white font-medium text-sm">Push-Benachrichtigungen</p>
-                <p className="text-xs text-slate-500">Erinnerungen wenn du vergisst auszustempeln</p>
+                <p className="text-white font-medium text-sm">{t('settings_push_label')}</p>
+                <p className="text-xs text-slate-500">{t('settings_push_sub')}</p>
               </div>
               <ToggleSwitch
                 active={settings.pushNotifications}
@@ -440,8 +440,8 @@ export function SettingsPage() {
             {platformInfo.supports.vibration && (
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-white font-medium text-sm">Vibration</p>
-                  <p className="text-xs text-slate-500">Haptic Feedback bei Aktionen</p>
+                  <p className="text-white font-medium text-sm">{t('settings_vibration_label')}</p>
+                  <p className="text-xs text-slate-500">{t('settings_vibration_sub')}</p>
                 </div>
                 <ToggleSwitch
                   active={settings.vibration}
@@ -462,7 +462,7 @@ export function SettingsPage() {
                   className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-xs transition-colors active:scale-95"
                 >
                   <Smartphone size={13} />
-                  Vibration testen
+                  {t('settings_vibration_test')}
                 </button>
               </div>
             </div>
@@ -525,9 +525,9 @@ export function SettingsPage() {
               <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Feature-Support</p>
               {([
                 { label: 'GPS / Geolocation', supported: platformInfo.supports.geolocation, icon: <Navigation size={14} /> },
-                { label: 'Push-Benachrichtigungen', supported: platformInfo.supports.push, icon: <Bell size={14} /> },
-                { label: 'Vibration / Haptics', supported: platformInfo.supports.vibration, icon: <Smartphone size={14} /> },
-                { label: 'Kamera (vorbereitet)', supported: platformInfo.supports.camera, icon: <Cpu size={14} /> },
+                { label: t('settings_push_label'), supported: platformInfo.supports.push, icon: <Bell size={14} /> },
+                { label: t('settings_vibration_label'), supported: platformInfo.supports.vibration, icon: <Smartphone size={14} /> },
+                { label: t('settings_camera_label'), supported: platformInfo.supports.camera, icon: <Cpu size={14} /> },
               ]).map(feat => (
                 <div key={feat.label} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2 text-slate-300">
@@ -537,7 +537,7 @@ export function SettingsPage() {
                   <span className={`text-xs font-medium ${
                     feat.supported ? 'text-working' : 'text-stopped'
                   }`}>
-                    {feat.supported ? '✅ Verfügbar' : '❌ Nicht verfügbar'}
+                    {feat.supported ? '✅ ' + t('settings_available') : '❌ ' + t('settings_unavailable')}
                   </span>
                 </div>
               ))}
@@ -556,7 +556,7 @@ export function SettingsPage() {
                     if (pos) {
                       setGpsTestResult(`✅ ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)} (±${pos.accuracy.toFixed(0)}m)`)
                     } else {
-                      setGpsTestResult('❌ Position nicht ermittelbar')
+                      setGpsTestResult('❌ ' + t('settings_gps_fail'))
                     }
                     setGpsTestLoading(false)
                   }}
@@ -564,7 +564,7 @@ export function SettingsPage() {
                   className="flex items-center justify-center gap-2 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-xs transition-colors disabled:opacity-50"
                 >
                   <MapPin size={14} />
-                  {gpsTestLoading ? 'Suche...' : 'GPS testen'}
+                  {gpsTestLoading ? t('settings_gps_searching') : t('settings_gps_test')}
                 </button>
 
                 {/* Notification Test */}
@@ -582,7 +582,7 @@ export function SettingsPage() {
                   className="flex items-center justify-center gap-2 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-xs transition-colors"
                 >
                   <Smartphone size={14} />
-                  Vibration testen
+                  {t('settings_vibration_test')}
                 </button>
 
                 {/* Berechtigungen anfragen */}

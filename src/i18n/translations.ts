@@ -322,10 +322,22 @@ export const translations = {
 
     // === Settings Platform Info ===
     settings_push_label: 'Push-Benachrichtigungen',
+    settings_push_sub: 'Erinnerungen wenn du vergisst auszustempeln',
     settings_vibration_label: 'Vibration / Haptics',
+    settings_vibration_sub: 'Haptic Feedback bei Aktionen',
+    settings_vibration_test: 'Vibration testen',
     settings_camera_label: 'Kamera (vorbereitet)',
     settings_gps_test: 'GPS testen',
     settings_gps_searching: 'Suche...',
+    settings_gps_fail: 'Position nicht ermittelbar',
+    settings_auto_stop: 'Automatischer Stop',
+    settings_auto_stop_sub: 'Arbeit automatisch beenden nach',
+    settings_auto_stop_after: 'Arbeit wird automatisch beendet nach',
+    settings_reminder_repeat: 'Erinnerung wird wiederholt alle',
+    settings_minutes: 'Minuten',
+    settings_full_auto: 'Voll-Auto',
+    settings_available: 'Verfügbar',
+    settings_unavailable: 'Nicht verfügbar',
 
     // === Notifications ===
     notif_pause_over: 'Deine Pause ist vorbei. Bitte zurück an die Arbeit!',
@@ -658,10 +670,22 @@ export const translations = {
 
     // === Settings Platform Info ===
     settings_push_label: 'Push Notifications',
+    settings_push_sub: 'Reminders when you forget to clock out',
     settings_vibration_label: 'Vibration / Haptics',
+    settings_vibration_sub: 'Haptic feedback for actions',
+    settings_vibration_test: 'Test Vibration',
     settings_camera_label: 'Camera (prepared)',
     settings_gps_test: 'Test GPS',
     settings_gps_searching: 'Searching...',
+    settings_gps_fail: 'Position not available',
+    settings_auto_stop: 'Automatic Stop',
+    settings_auto_stop_sub: 'Automatically stop work after',
+    settings_auto_stop_after: 'Work will automatically stop after',
+    settings_reminder_repeat: 'Reminder repeats every',
+    settings_minutes: 'minutes',
+    settings_full_auto: 'Full Auto',
+    settings_available: 'Available',
+    settings_unavailable: 'Not available',
 
     // === Notifications ===
     notif_pause_over: 'Your break is over. Please return to work!',
@@ -994,10 +1018,22 @@ export const translations = {
 
     // === Settings Platform Info ===
     settings_push_label: 'Push-уведомления',
+    settings_push_sub: 'Напоминания, если вы забыли отметиться',
     settings_vibration_label: 'Вибрация / Тактильная связь',
+    settings_vibration_sub: 'Тактильная обратная связь для действий',
+    settings_vibration_test: 'Тест вибрации',
     settings_camera_label: 'Камера (подготовлено)',
     settings_gps_test: 'Тест GPS',
     settings_gps_searching: 'Поиск...',
+    settings_gps_fail: 'Позиция недоступна',
+    settings_auto_stop: 'Автоматическая остановка',
+    settings_auto_stop_sub: 'Автоматически остановить работу после',
+    settings_auto_stop_after: 'Работа будет автоматически остановлена после',
+    settings_reminder_repeat: 'Напоминание повторяется каждые',
+    settings_minutes: 'минут',
+    settings_full_auto: 'Полный авто',
+    settings_available: 'Доступно',
+    settings_unavailable: 'Недоступно',
 
     // === Notifications ===
     notif_pause_over: 'Ваш перерыв окончен. Пожалуйста, вернитесь к работе!',
