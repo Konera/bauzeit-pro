@@ -67,18 +67,50 @@ export async function getCurrentPosition(): Promise<GeoPosition | null> {
 
 /**
  * Prüft den aktuellen GPS-Berechtigungsstatus.
- * - Nativ: Capacitor Geolocation.checkPermissions()
+ * - Nativ: Capacitor checkPermissions() → bei 'prompt' automatisch requestPermissions()
  * - Web: navigator.permissions.query
  */
 export async function checkLocationPermission(): Promise<'granted' | 'denied' | 'prompt' | 'unavailable'> {
   try {
     if (isNativeApp()) {
       const Geolocation = await getCapacitorGeolocation()
-      const status = await Geolocation.checkPermissions()
-      // Capacitor gibt 'granted' | 'denied' | 'prompt' zurück
-      if (status.location === 'granted') return 'granted'
-      if (status.location === 'denied') return 'denied'
-      return 'prompt'
+
+      // Timeout: Check darf maximal 3 Sekunden dauern
+      const checkWithTimeout = Promise.race([
+        Geolocation.checkPermissions(),
+        new Promise<{ location: string }>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 3000)
+        ),
+      ])
+
+      try {
+        const status = await checkWithTimeout
+        if (status.location === 'granted') return 'granted'
+        if (status.location === 'denied') return 'denied'
+
+        // 'prompt' → Automatisch anfragen
+        try {
+          const reqStatus = await Promise.race([
+            Geolocation.requestPermissions(),
+            new Promise<{ location: string }>((_, reject) =>
+              setTimeout(() => reject(new Error('timeout')), 5000)
+            ),
+          ])
+          if (reqStatus.location === 'granted') return 'granted'
+          return 'denied'
+        } catch {
+          return 'prompt'
+        }
+      } catch {
+        // checkPermissions timeout/fehler → Versuch GPS direkt abzufragen
+        try {
+          const pos = await Geolocation.getCurrentPosition({ timeout: 3000 })
+          if (pos) return 'granted'
+        } catch {
+          // GPS nicht verfügbar
+        }
+        return 'prompt' // Statt 'unavailable' — Gerät könnte GPS haben
+      }
     }
 
     // Web-Fallback
@@ -95,7 +127,7 @@ export async function checkLocationPermission(): Promise<'granted' | 'denied' | 
 
     return 'prompt'
   } catch {
-    return 'unavailable'
+    return 'prompt' // 'prompt' statt 'unavailable' — GPS könnte verfügbar sein
   }
 }
 
