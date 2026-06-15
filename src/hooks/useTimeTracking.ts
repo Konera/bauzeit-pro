@@ -78,11 +78,12 @@ export function useTimeTracking(
   const activeEntryRef = useRef<TimeEntry | null>(null)
   const currentBreakRef = useRef<BreakEntry | null>(null)
 
-  // Phase 2/3: GPS-Status beim Mount prüfen + Samsung: Berechtigung proaktiv anfordern
+  // GPS-Status beim Mount prüfen — funktioniert auf ALLEN Android-Geräten
   useEffect(() => {
     async function checkGps() {
       try {
-        // Timeout: GPS-Check darf maximal 5 Sekunden dauern
+        // Einfachster Check: Versuche eine Position zu holen.
+        // locationService hat bereits Capacitor → Browser-Fallback eingebaut.
         const status = await Promise.race([
           locationService.checkLocationPermission(),
           new Promise<'unavailable'>((resolve) => setTimeout(() => resolve('unavailable'), 5000)),
@@ -91,25 +92,24 @@ export function useTimeTracking(
         if (status === 'granted') {
           setState(prev => ({ ...prev, gpsStatus: 'available' }))
         } else if (status === 'denied') {
-          setState(prev => ({ ...prev, gpsStatus: 'denied' }))
+          // Nicht sofort aufgeben — requestPermission versuchen
+          const reqResult = await Promise.race([
+            locationService.requestLocationPermission(),
+            new Promise<'denied'>((resolve) => setTimeout(() => resolve('denied'), 5000)),
+          ])
+          setState(prev => ({
+            ...prev,
+            gpsStatus: reqResult === 'granted' ? 'available' : 'denied',
+          }))
         } else {
-          // 'prompt' oder 'unavailable' → Berechtigung proaktiv anfordern
-          // Samsung zeigt den Dialog erst bei requestPermissions()
-          try {
-            const reqResult = await Promise.race([
-              locationService.requestLocationPermission(),
-              new Promise<'denied'>((resolve) => setTimeout(() => resolve('denied'), 5000)),
-            ])
-            setState(prev => ({
-              ...prev,
-              gpsStatus: reqResult === 'granted' ? 'available' : 'denied',
-            }))
-          } catch {
-            setState(prev => ({ ...prev, gpsStatus: 'unavailable' }))
-          }
+          // 'prompt' oder 'unavailable' → Position direkt versuchen
+          const pos = await locationService.getCurrentPosition()
+          setState(prev => ({
+            ...prev,
+            gpsStatus: pos ? 'available' : 'unavailable',
+          }))
         }
       } catch {
-        // GPS-Check fehlgeschlagen → nicht blockieren
         setState(prev => ({ ...prev, gpsStatus: 'unavailable' }))
       }
     }
