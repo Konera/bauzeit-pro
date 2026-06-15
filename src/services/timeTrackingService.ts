@@ -12,7 +12,15 @@ import { parseISO, differenceInMinutes } from 'date-fns'
 // =========================================
 
 async function tryGetPosition(): Promise<GeoPosition | null> {
-  return locationService.getCurrentPosition()
+  try {
+    // 3s Hard-Timeout: GPS darf startWork NIEMALS blockieren
+    return await Promise.race([
+      locationService.getCurrentPosition(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+    ])
+  } catch {
+    return null
+  }
 }
 
 // =========================================
@@ -83,31 +91,37 @@ export async function startWork(
     return { entry: existing, error: 'Du hast bereits einen aktiven Zeiteintrag. Bitte zuerst Arbeit beenden.' }
   }
 
-  const position = await tryGetPosition()
+  // GPS ist komplett optional — darf startWork NIEMALS blockieren
+  let position: GeoPosition | null = null
   const now = new Date().toISOString()
-
-  // Phase 2: Geofence-Check und GPS-Warnung berechnen
   let gpsWarning = false
   let startDistanceM: number | null = null
-  if (position) {
-    try {
-      const { data: site } = await supabase
-        .from('construction_sites')
-        .select('gps_lat, gps_lng, gps_radius_m')
-        .eq('id', siteId)
-        .maybeSingle()
 
-      if (site && site.gps_lat != null && site.gps_lng != null) {
-        const fence = gpsService.checkGeofence(
-          position,
-          site as ConstructionSite
-        )
-        startDistanceM = fence.distanceMeters
-        gpsWarning = !fence.isInside
+  try {
+    position = await tryGetPosition()
+    if (position) {
+      try {
+        const { data: site } = await supabase
+          .from('construction_sites')
+          .select('gps_lat, gps_lng, gps_radius_m')
+          .eq('id', siteId)
+          .maybeSingle()
+
+        if (site && site.gps_lat != null && site.gps_lng != null) {
+          const fence = gpsService.checkGeofence(
+            position,
+            site as ConstructionSite
+          )
+          startDistanceM = fence.distanceMeters
+          gpsWarning = !fence.isInside
+        }
+      } catch {
+        // Geofence-Check ist nicht-blockierend
       }
-    } catch {
-      // Geofence-Check ist nicht-blockierend
     }
+  } catch (gpsErr) {
+    console.warn('GPS in startWork komplett fehlgeschlagen (non-blocking):', gpsErr)
+    // Arbeit startet ohne GPS-Daten
   }
 
   const baseEntry = {

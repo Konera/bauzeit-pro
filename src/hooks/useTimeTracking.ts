@@ -281,29 +281,21 @@ export function useTimeTracking(
 
     setState(prev => ({ ...prev, syncing: true, error: null, gpsWarning: null }))
 
-    try {
-      // Phase 2/3: GPS-Geofence-Check NON-BLOCKING (darf Start NIEMALS verhindern)
-      const selectedSite = state.sites.find(s => s.id === state.selectedSiteId)
-      try {
-        if (selectedSite && selectedSite.gps_lat && selectedSite.gps_lng) {
-          const position = await locationService.getCurrentPosition()
-          if (position) {
-            const fence = locationService.isInsideConstructionSite(position, selectedSite)
-            if (!fence.isInside) {
-              setState(prev => ({
-                ...prev,
-                gpsWarning: `Du bist ${fence.distanceMeters}m von der Baustelle entfernt.`,
-              }))
-              // Warnung wird angezeigt, aber Arbeit kann trotzdem gestartet werden
-            }
-          }
-        }
-      } catch (gpsErr) {
-        console.warn('GPS-Check vor Start fehlgeschlagen (non-blocking):', gpsErr)
-        // GPS-Fehler ignorieren — Arbeit wird trotzdem gestartet
-      }
+    // 15s HARD-TIMEOUT: Button darf NIE ewig laden
+    const timeoutId = setTimeout(() => {
+      console.error('handleStartWork: 15s Hard-Timeout erreicht!')
+      setState(prev => ({
+        ...prev,
+        syncing: false,
+        error: 'Zeitüberschreitung. Bitte nochmal versuchen.',
+      }))
+      isSubmittingRef.current = false
+    }, 15000)
 
+    try {
       const { entry, error } = await startWork(employeeId, state.selectedSiteId)
+
+      clearTimeout(timeoutId)
 
       if (error) {
         setState(prev => ({ ...prev, syncing: false, error }))
@@ -345,6 +337,7 @@ export function useTimeTracking(
         }
       })()
     } catch (error) {
+      clearTimeout(timeoutId)
       setState(prev => ({
         ...prev,
         syncing: false,
