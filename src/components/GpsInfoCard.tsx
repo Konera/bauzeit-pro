@@ -80,7 +80,7 @@ export function GpsInfoCard({ isActive }: GpsInfoCardProps) {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {/* Entfernung */}
         <div className="text-center">
           <div className="text-[10px] text-slate-500 mb-0.5">{t('gps_distance')}</div>
@@ -94,15 +94,6 @@ export function GpsInfoCard({ isActive }: GpsInfoCardProps) {
           <div className="text-[10px] text-slate-500 mb-0.5">{t('gps_accuracy')}</div>
           <div className={`text-sm font-bold ${accuracyColor}`}>
             {accuracy !== null ? `±${Math.round(accuracy)}m` : '–'}
-          </div>
-        </div>
-
-        {/* Geschwindigkeit */}
-        <div className="text-center">
-          <div className="text-[10px] text-slate-500 mb-0.5">Speed</div>
-          <div className={`text-sm font-bold ${speedKmh > 15 ? 'text-construction-400' : 'text-white'}`}>
-            {speedKmh > 0 ? `${Math.round(speedKmh)}` : '0'}
-            <span className="text-[9px] text-slate-500 ml-0.5">km/h</span>
           </div>
         </div>
 
