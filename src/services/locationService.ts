@@ -272,6 +272,104 @@ export function isInsideConstructionSite(position: GeoPosition, site: Constructi
 }
 
 // =========================================
+// GPS-Diagnose (für Debugging auf Geräten)
+// =========================================
+
+export interface GpsDiagnostics {
+  platform: string
+  isNative: boolean
+  pluginLoaded: boolean
+  pluginPermission: string
+  browserApiAvailable: boolean
+  capacitorPosition: GeoPosition | null
+  capacitorError: string | null
+  browserPosition: GeoPosition | null
+  browserError: string | null
+  finalResult: 'success' | 'failed'
+}
+
+/**
+ * Führt eine vollständige GPS-Diagnose durch.
+ * Testet Capacitor-Plugin UND Browser-API separat.
+ */
+export async function runGpsDiagnostics(): Promise<GpsDiagnostics> {
+  const result: GpsDiagnostics = {
+    platform: isNativeApp() ? 'native' : 'web',
+    isNative: isNativeApp(),
+    pluginLoaded: false,
+    pluginPermission: 'unknown',
+    browserApiAvailable: 'geolocation' in navigator,
+    capacitorPosition: null,
+    capacitorError: null,
+    browserPosition: null,
+    browserError: null,
+    finalResult: 'failed',
+  }
+
+  // Test 1: Capacitor Plugin
+  if (isNativeApp()) {
+    try {
+      const Geolocation = await getCapacitorGeolocation()
+      result.pluginLoaded = true
+
+      try {
+        const perm = await Geolocation.checkPermissions()
+        result.pluginPermission = perm.location
+      } catch (e) {
+        result.pluginPermission = 'check-error: ' + String(e)
+      }
+
+      try {
+        const pos = await Promise.race([
+          Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 5000 }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('5s timeout')), 5500)),
+        ])
+        result.capacitorPosition = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        }
+      } catch (e) {
+        result.capacitorError = String(e)
+      }
+    } catch (e) {
+      result.capacitorError = 'Plugin load failed: ' + String(e)
+    }
+  }
+
+  // Test 2: Browser API
+  try {
+    const browserPos = await _getBrowserPosition(5000)
+    result.browserPosition = browserPos
+    if (!browserPos) result.browserError = 'Returned null (denied or timeout)'
+  } catch (e) {
+    result.browserError = String(e)
+  }
+
+  // Final
+  if (result.capacitorPosition || result.browserPosition) {
+    result.finalResult = 'success'
+  }
+
+  return result
+}
+
+/**
+ * Öffnet die Android Standort-Einstellungen.
+ * Auf Web/iOS wird nichts gemacht.
+ */
+export async function openLocationSettings(): Promise<void> {
+  if (isNativeApp()) {
+    try {
+      // Android: App-Einstellungen öffnen über Custom URL
+      window.open('intent://settings/location#Intent;scheme=android-app;end', '_system')
+    } catch {
+      console.warn('Standort-Einstellungen konnten nicht geöffnet werden')
+    }
+  }
+}
+
+// =========================================
 // Service-Objekt
 // =========================================
 
@@ -281,6 +379,9 @@ export const locationService = {
   requestLocationPermission,
   calculateDistanceFromSite,
   isInsideConstructionSite,
+  runGpsDiagnostics,
+  openLocationSettings,
 }
 
 export default locationService
+

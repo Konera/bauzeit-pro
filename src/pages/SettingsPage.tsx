@@ -547,24 +547,39 @@ export function SettingsPage() {
             <div className="pt-2 border-t border-slate-700 space-y-2">
               <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Tests</p>
               <div className="grid grid-cols-2 gap-2">
-                {/* GPS Test */}
+                {/* GPS Diagnose */}
                 <button
                   onClick={async () => {
                     setGpsTestLoading(true)
                     setGpsTestResult(null)
-                    const pos = await locationService.getCurrentPosition()
-                    if (pos) {
-                      setGpsTestResult(`✅ ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)} (±${pos.accuracy.toFixed(0)}m)`)
-                    } else {
-                      setGpsTestResult('❌ ' + t('settings_gps_fail'))
+                    try {
+                      const diag = await locationService.runGpsDiagnostics()
+                      const lines = [
+                        `📱 Plattform: ${diag.platform}`,
+                        `🔌 Plugin: ${diag.pluginLoaded ? '✅ geladen' : '❌ fehlt'}`,
+                        `🔑 Permission: ${diag.pluginPermission}`,
+                        `🌐 Browser-API: ${diag.browserApiAvailable ? '✅' : '❌'}`,
+                        '',
+                        diag.capacitorPosition
+                          ? `📡 Capacitor: ✅ ${diag.capacitorPosition.lat.toFixed(4)}, ${diag.capacitorPosition.lng.toFixed(4)} (±${diag.capacitorPosition.accuracy.toFixed(0)}m)`
+                          : `📡 Capacitor: ❌ ${diag.capacitorError || 'kein Ergebnis'}`,
+                        diag.browserPosition
+                          ? `🌐 Browser: ✅ ${diag.browserPosition.lat.toFixed(4)}, ${diag.browserPosition.lng.toFixed(4)} (±${diag.browserPosition.accuracy.toFixed(0)}m)`
+                          : `🌐 Browser: ❌ ${diag.browserError || 'kein Ergebnis'}`,
+                        '',
+                        `Ergebnis: ${diag.finalResult === 'success' ? '✅ GPS funktioniert' : '❌ GPS fehlgeschlagen'}`,
+                      ]
+                      setGpsTestResult(lines.join('\n'))
+                    } catch (e) {
+                      setGpsTestResult('❌ Diagnose fehlgeschlagen: ' + String(e))
                     }
                     setGpsTestLoading(false)
                   }}
                   disabled={gpsTestLoading}
-                  className="flex items-center justify-center gap-2 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-xs transition-colors disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 py-2.5 bg-construction-500/20 hover:bg-construction-500/30 text-construction-400 rounded-xl text-xs transition-colors disabled:opacity-50 col-span-2"
                 >
                   <MapPin size={14} />
-                  {gpsTestLoading ? t('settings_gps_searching') : t('settings_gps_test')}
+                  {gpsTestLoading ? '🔍 GPS wird getestet...' : '📍 GPS-Diagnose starten'}
                 </button>
 
                 {/* Notification Test */}
@@ -598,11 +613,11 @@ export function SettingsPage() {
                 </button>
               </div>
 
-              {/* GPS Test-Ergebnis */}
+              {/* GPS Diagnose-Ergebnis */}
               {gpsTestResult && (
-                <p className="text-xs text-slate-400 bg-slate-800 p-2 rounded-lg font-mono">
+                <pre className="text-xs text-slate-300 bg-slate-800 p-3 rounded-lg font-mono whitespace-pre-wrap leading-relaxed">
                   {gpsTestResult}
-                </p>
+                </pre>
               )}
             </div>
 
