@@ -78,42 +78,21 @@ export function useTimeTracking(
   const activeEntryRef = useRef<TimeEntry | null>(null)
   const currentBreakRef = useRef<BreakEntry | null>(null)
 
-  // GPS-Status beim Mount prüfen — funktioniert auf ALLEN Android-Geräten
+  // GPS-Status: Einfacher Check im Hintergrund (blockiert NIE die UI)
   useEffect(() => {
-    async function checkGps() {
+    // GPS-Status verzögert prüfen — App soll zuerst vollständig laden
+    const timer = setTimeout(async () => {
       try {
-        // Einfachster Check: Versuche eine Position zu holen.
-        // locationService hat bereits Capacitor → Browser-Fallback eingebaut.
-        const status = await Promise.race([
-          locationService.checkLocationPermission(),
-          new Promise<'unavailable'>((resolve) => setTimeout(() => resolve('unavailable'), 5000)),
-        ])
-
-        if (status === 'granted') {
-          setState(prev => ({ ...prev, gpsStatus: 'available' }))
-        } else if (status === 'denied') {
-          // Nicht sofort aufgeben — requestPermission versuchen
-          const reqResult = await Promise.race([
-            locationService.requestLocationPermission(),
-            new Promise<'denied'>((resolve) => setTimeout(() => resolve('denied'), 5000)),
-          ])
-          setState(prev => ({
-            ...prev,
-            gpsStatus: reqResult === 'granted' ? 'available' : 'denied',
-          }))
-        } else {
-          // 'prompt' oder 'unavailable' → Position direkt versuchen
-          const pos = await locationService.getCurrentPosition()
-          setState(prev => ({
-            ...prev,
-            gpsStatus: pos ? 'available' : 'unavailable',
-          }))
-        }
+        const pos = await locationService.getCurrentPosition()
+        setState(prev => ({
+          ...prev,
+          gpsStatus: pos ? 'available' : 'unavailable',
+        }))
       } catch {
         setState(prev => ({ ...prev, gpsStatus: 'unavailable' }))
       }
-    }
-    checkGps()
+    }, 2000) // 2s warten bis App geladen ist
+    return () => clearTimeout(timer)
   }, [])
 
   // Sync Refs mit State

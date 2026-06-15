@@ -79,51 +79,24 @@ export async function startWork(
   employeeId: string,
   siteId: string
 ): Promise<{ entry: TimeEntry; error?: string }> {
-  // BUG-005 Fix: Explizite Validierung vor DB-Aufruf
+  // Validierung
   if (!siteId || siteId.trim() === '') {
     throw new Error('Keine Baustelle ausgewählt. Bitte eine Baustelle auswählen.')
   }
   if (!employeeId || employeeId.trim() === '') {
     throw new Error('Mitarbeiter-ID fehlt. Bitte neu einloggen.')
   }
+
+  // Prüfe ob bereits ein Eintrag offen ist
   const existing = await getOpenTimeEntry(employeeId)
   if (existing) {
     return { entry: existing, error: 'Du hast bereits einen aktiven Zeiteintrag. Bitte zuerst Arbeit beenden.' }
   }
 
-  // GPS ist komplett optional — darf startWork NIEMALS blockieren
-  let position: GeoPosition | null = null
   const now = new Date().toISOString()
-  let gpsWarning = false
-  let startDistanceM: number | null = null
 
-  try {
-    position = await tryGetPosition()
-    if (position) {
-      try {
-        const { data: site } = await supabase
-          .from('construction_sites')
-          .select('gps_lat, gps_lng, gps_radius_m')
-          .eq('id', siteId)
-          .maybeSingle()
-
-        if (site && site.gps_lat != null && site.gps_lng != null) {
-          const fence = gpsService.checkGeofence(
-            position,
-            site as ConstructionSite
-          )
-          startDistanceM = fence.distanceMeters
-          gpsWarning = !fence.isInside
-        }
-      } catch {
-        // Geofence-Check ist nicht-blockierend
-      }
-    }
-  } catch (gpsErr) {
-    console.warn('GPS in startWork komplett fehlgeschlagen (non-blocking):', gpsErr)
-    // Arbeit startet ohne GPS-Daten
-  }
-
+  // SOFORT starten — KEIN GPS, KEIN Geofence, NUR Supabase Insert
+  // GPS-Daten werden NACHTRÄGLICH im Hintergrund geholt
   const baseEntry = {
     employee_id: employeeId,
     site_id: siteId,
@@ -132,37 +105,20 @@ export async function startWork(
     pause_minutes: 0,
     total_minutes: 0,
     status: 'open',
-    start_lat: position?.lat ?? null,
-    start_lng: position?.lng ?? null,
+    start_lat: null,
+    start_lng: null,
     end_lat: null,
     end_lng: null,
     source: 'mobile',
     admin_comment: null,
   }
 
-  const phase2Entry = {
-    ...baseEntry,
-    gps_warning: gpsWarning,
-    start_distance_m: startDistanceM,
-    end_distance_m: null,
-  }
-
-  // Erst mit Phase-2-Feldern versuchen
+  // Ein einziger Supabase-Call — so schnell wie möglich
   let result = await supabase
     .from('time_entries')
-    .insert(phase2Entry)
+    .insert(baseEntry)
     .select(`*, site:construction_sites(*), breaks:break_entries(*)`)
     .single()
-
-  if (result.error) {
-    console.warn('startWork Phase-2 Insert fehlgeschlagen, versuche Basic-Insert:', result.error.message)
-    // Fallback: Ohne Phase-2-Spalten
-    result = await supabase
-      .from('time_entries')
-      .insert(baseEntry)
-      .select(`*, site:construction_sites(*), breaks:break_entries(*)`)
-      .single()
-  }
 
   if (result.error) {
     console.warn('Online-Speicherung fehlgeschlagen, offline speichern:', result.error.message)
@@ -177,8 +133,27 @@ export async function startWork(
     return { entry: saved }
   }
 
+  const entry = result.data as TimeEntry
+
+  // GPS im Hintergrund nachladen (NON-BLOCKING)
+  ;(async () => {
+    try {
+      const position = await locationService.getCurrentPosition()
+      if (position && entry.id) {
+        // Position nachträglich zum Eintrag hinzufügen
+        await supabase.from('time_entries').update({
+          start_lat: position.lat,
+          start_lng: position.lng,
+        }).eq('id', entry.id)
+        console.log('GPS nachträglich gespeichert:', position.lat, position.lng)
+      }
+    } catch {
+      console.warn('GPS-Nachtrag fehlgeschlagen (ignoriert)')
+    }
+  })()
+
   await hapticsService.vibrateSuccess()
-  return { entry: result.data as TimeEntry }
+  return { entry }
 }
 
 // =========================================
