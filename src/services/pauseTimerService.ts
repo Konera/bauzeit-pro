@@ -66,6 +66,7 @@ export async function schedulePauseWarning(params: {
           body: `Noch ${warningBeforeMinutes} Minuten Pause übrig!`,
           schedule: { at: triggerTime },
           sound: 'default',
+          channelId: 'pause_alerts',
           extra: { type: 'pause_warning' },
         }],
       })
@@ -121,6 +122,7 @@ export async function schedulePauseAlarm(params: {
         body: `Deine ${maxPauseMinutes}-Minuten-Pause ist vorbei. Bitte zurück zur Arbeit!`,
         schedule: { at: alarmTime },
         sound: 'default',
+        channelId: 'pause_alerts',
         extra: { type: 'pause_expired' },
       }]
 
@@ -132,6 +134,7 @@ export async function schedulePauseAlarm(params: {
           body: `Du bist seit ${maxPauseMinutes + (i + 1) * 5} Minuten in Pause!`,
           schedule: { at: new Date(alarmTime.getTime() + (i + 1) * 5 * 60 * 1000) },
           sound: 'default',
+          channelId: 'pause_alerts',
           extra: { type: 'pause_overdue' },
         })
       }
@@ -178,6 +181,7 @@ async function showPauseExpiredNotification(): Promise<void> {
           body: 'Deine Pause ist vorbei. Bitte zurück zur Arbeit!',
           schedule: { at: new Date(Date.now() + 100) },
           sound: 'default',
+          channelId: 'pause_alerts',
         }],
       })
       return

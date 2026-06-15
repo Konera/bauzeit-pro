@@ -100,6 +100,7 @@ export async function scheduleWorkReminder(params: {
           body: `Du arbeitest seit über ${maxHours} Stunden. Vergiss nicht auszustempeln!`,
           schedule: { at: triggerTime },
           sound: 'default',
+          channelId: 'work_reminders',
           extra: { timeEntryId, employeeId, type: 'overtime_warning' },
         }],
       })
@@ -153,6 +154,7 @@ export async function scheduleRepeatedStopReminder(params: {
         body: 'Du bist noch eingestempelt. Arbeit beenden?',
         schedule: { at: new Date(Date.now() + intervalMs * (i + 1)) },
         sound: 'default',
+        channelId: 'work_reminders',
         extra: { timeEntryId, employeeId, type: 'forgot_stop' },
       }))
       await LocalNotifications.schedule({ notifications })
@@ -235,6 +237,7 @@ export async function showImmediateReminder(title: string, body: string): Promis
           body,
           schedule: { at: new Date(Date.now() + 100) }, // Sofort (100ms Verzögerung)
           sound: 'default',
+          channelId: 'pause_alerts',
         }],
       })
       return
@@ -269,6 +272,7 @@ export async function testNotification(): Promise<void> {
           body: 'Test-Benachrichtigung erfolgreich! 🎉',
           schedule: { at: new Date(Date.now() + 100) },
           sound: 'default',
+          channelId: 'work_reminders',
         }],
       })
       return

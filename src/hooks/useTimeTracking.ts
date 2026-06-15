@@ -77,6 +77,7 @@ export function useTimeTracking(
   // Refs für stabile Zugriffe in Closures (BUG-001 Fix)
   const activeEntryRef = useRef<TimeEntry | null>(null)
   const currentBreakRef = useRef<BreakEntry | null>(null)
+  const autoPauseEndFiredRef = useRef(false) // Verhindert doppeltes Auto-Pause-Ende
 
   // GPS-Status: Einfacher Check im Hintergrund (blockiert NIE die UI)
   useEffect(() => {
@@ -114,6 +115,7 @@ export function useTimeTracking(
 
   const startTimer = useCallback((entry: TimeEntry) => {
     if (timerRef.current) clearInterval(timerRef.current)
+    autoPauseEndFiredRef.current = false
 
     timerRef.current = setInterval(() => {
       // BUG-001 Fix: Refs lesen statt Closure-Werte
@@ -129,9 +131,40 @@ export function useTimeTracking(
         currentBreak?.start_time
       )
 
+      // AUTO-PAUSE-ENDE: Wenn Pausenzeit abgelaufen → automatisch beenden
+      if (currentBreak && stableSettings.autoPauseEnd && !autoPauseEndFiredRef.current) {
+        const maxPauseSeconds = stableSettings.maxPauseMinutes * 60
+        if (pausedSeconds >= maxPauseSeconds) {
+          autoPauseEndFiredRef.current = true
+          console.log('[AutoPause] Pausenzeit abgelaufen, beende automatisch')
+          // Pause im nächsten Tick beenden (nicht im setInterval-Callback)
+          setTimeout(() => {
+            endPause(entry.id, entry.employee_id).then(({ updatedEntry }) => {
+              currentBreakRef.current = null
+              activeEntryRef.current = updatedEntry
+              setState(prev => ({
+                ...prev,
+                activeEntry: updatedEntry,
+                currentBreak: null,
+                status: 'working',
+              }))
+              pauseTimerService.cancelPauseAlarms().catch(() => {})
+            }).catch(err => {
+              console.error('[AutoPause] Fehler:', err)
+              autoPauseEndFiredRef.current = false // Retry erlauben
+            })
+            // Notification: Pause wurde automatisch beendet
+            mobileNotificationService.showImmediateReminder(
+              '⏸️ Pause automatisch beendet',
+              `Deine ${stableSettings.maxPauseMinutes}-Minuten-Pause wurde automatisch beendet.`
+            ).catch(() => {})
+          }, 0)
+        }
+      }
+
       setState(prev => ({ ...prev, workedSeconds, pausedSeconds }))
     }, 1000)
-  }, [])
+  }, [stableSettings.autoPauseEnd, stableSettings.maxPauseMinutes])
 
   // =========================================
   // Daten laden
@@ -445,6 +478,46 @@ export function useTimeTracking(
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }))
   }, [])
+
+  // App-Resume: Prüfe ob Pause abgelaufen ist (wenn App im Hintergrund war)
+  useEffect(() => {
+    const handleResume = () => {
+      const currentBreak = currentBreakRef.current
+      const activeEntry = activeEntryRef.current
+      if (currentBreak && activeEntry && stableSettings.autoPauseEnd && !autoPauseEndFiredRef.current) {
+        const pausedMs = Date.now() - new Date(currentBreak.start_time).getTime()
+        if (pausedMs >= stableSettings.maxPauseMinutes * 60 * 1000) {
+          console.log('[AutoPause] App-Resume: Pause abgelaufen, beende automatisch')
+          autoPauseEndFiredRef.current = true
+          endPause(activeEntry.id, activeEntry.employee_id).then(({ updatedEntry }) => {
+            currentBreakRef.current = null
+            activeEntryRef.current = updatedEntry
+            setState(prev => ({
+              ...prev,
+              activeEntry: updatedEntry,
+              currentBreak: null,
+              status: 'working',
+            }))
+            pauseTimerService.cancelPauseAlarms().catch(() => {})
+          }).catch(err => console.error('[AutoPause] Resume-Fehler:', err))
+          mobileNotificationService.showImmediateReminder(
+            '⏸️ Pause automatisch beendet',
+            `Deine ${stableSettings.maxPauseMinutes}-Minuten-Pause wurde automatisch beendet.`
+          ).catch(() => {})
+        }
+      }
+    }
+
+    // Browser + Capacitor WebView: visibilitychange
+    const onVisChange = () => {
+      if (document.visibilityState === 'visible') handleResume()
+    }
+    document.addEventListener('visibilitychange', onVisChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisChange)
+    }
+  }, [stableSettings.autoPauseEnd, stableSettings.maxPauseMinutes])
 
   // Cleanup beim Unmount
   useEffect(() => {
