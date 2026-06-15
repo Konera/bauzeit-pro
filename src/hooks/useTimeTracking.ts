@@ -78,22 +78,34 @@ export function useTimeTracking(
   const activeEntryRef = useRef<TimeEntry | null>(null)
   const currentBreakRef = useRef<BreakEntry | null>(null)
   const autoPauseEndFiredRef = useRef(false) // Verhindert doppeltes Auto-Pause-Ende
+  const stableSettingsRef = useRef(stableSettings) // Ref für Timer-Zugriff ohne Dependency
+  stableSettingsRef.current = stableSettings
 
-  // GPS-Status: Einfacher Check im Hintergrund (blockiert NIE die UI)
+  // GPS-Status: Wiederholt prüfen (nicht nur einmal — Android GPS startet langsam)
   useEffect(() => {
-    // GPS-Status verzögert prüfen — App soll zuerst vollständig laden
-    const timer = setTimeout(async () => {
+    let cancelled = false
+    const checkGps = async () => {
       try {
         const pos = await locationService.getCurrentPosition()
-        setState(prev => ({
-          ...prev,
-          gpsStatus: pos ? 'available' : 'unavailable',
-        }))
+        if (!cancelled) {
+          setState(prev => ({
+            ...prev,
+            gpsStatus: pos ? 'available' : 'unavailable',
+          }))
+        }
       } catch {
-        setState(prev => ({ ...prev, gpsStatus: 'unavailable' }))
+        if (!cancelled) setState(prev => ({ ...prev, gpsStatus: 'unavailable' }))
       }
-    }, 2000) // 2s warten bis App geladen ist
-    return () => clearTimeout(timer)
+    }
+    // Erster Check nach 3s, dann alle 30s (Android GPS braucht oft 5-10s zum Initialisieren)
+    const timer1 = setTimeout(checkGps, 3000)
+    const interval = setInterval(checkGps, 30000)
+    return () => { cancelled = true; clearTimeout(timer1); clearInterval(interval) }
+  }, [])
+
+  // Notification-Permission beim Start anfragen (Android)
+  useEffect(() => {
+    mobileNotificationService.requestPermission().catch(() => {})
   }, [])
 
   // Sync Refs mit State
@@ -120,6 +132,8 @@ export function useTimeTracking(
     timerRef.current = setInterval(() => {
       // BUG-001 Fix: Refs lesen statt Closure-Werte
       const currentBreak = currentBreakRef.current
+      // Settings über Ref lesen — NICHT über Closure (sonst Dependency-Loop)
+      const settings = stableSettingsRef.current
 
       const pausedSeconds = currentBreak
         ? Math.floor((Date.now() - new Date(currentBreak.start_time).getTime()) / 1000)
@@ -132,8 +146,8 @@ export function useTimeTracking(
       )
 
       // AUTO-PAUSE-ENDE: Wenn Pausenzeit abgelaufen → automatisch beenden
-      if (currentBreak && stableSettings.autoPauseEnd && !autoPauseEndFiredRef.current) {
-        const maxPauseSeconds = stableSettings.maxPauseMinutes * 60
+      if (currentBreak && settings.autoPauseEnd && !autoPauseEndFiredRef.current) {
+        const maxPauseSeconds = settings.maxPauseMinutes * 60
         if (pausedSeconds >= maxPauseSeconds) {
           autoPauseEndFiredRef.current = true
           console.log('[AutoPause] Pausenzeit abgelaufen, beende automatisch')
@@ -156,7 +170,7 @@ export function useTimeTracking(
             // Notification: Pause wurde automatisch beendet
             mobileNotificationService.showImmediateReminder(
               '⏸️ Pause automatisch beendet',
-              `Deine ${stableSettings.maxPauseMinutes}-Minuten-Pause wurde automatisch beendet.`
+              `Deine ${settings.maxPauseMinutes}-Minuten-Pause wurde automatisch beendet.`
             ).catch(() => {})
           }, 0)
         }
@@ -164,7 +178,7 @@ export function useTimeTracking(
 
       setState(prev => ({ ...prev, workedSeconds, pausedSeconds }))
     }, 1000)
-  }, [stableSettings.autoPauseEnd, stableSettings.maxPauseMinutes])
+  }, []) // KEINE Dependencies — liest alles über Refs
 
   // =========================================
   // Daten laden
@@ -484,9 +498,10 @@ export function useTimeTracking(
     const handleResume = () => {
       const currentBreak = currentBreakRef.current
       const activeEntry = activeEntryRef.current
-      if (currentBreak && activeEntry && stableSettings.autoPauseEnd && !autoPauseEndFiredRef.current) {
+      const settings = stableSettingsRef.current
+      if (currentBreak && activeEntry && settings.autoPauseEnd && !autoPauseEndFiredRef.current) {
         const pausedMs = Date.now() - new Date(currentBreak.start_time).getTime()
-        if (pausedMs >= stableSettings.maxPauseMinutes * 60 * 1000) {
+        if (pausedMs >= settings.maxPauseMinutes * 60 * 1000) {
           console.log('[AutoPause] App-Resume: Pause abgelaufen, beende automatisch')
           autoPauseEndFiredRef.current = true
           endPause(activeEntry.id, activeEntry.employee_id).then(({ updatedEntry }) => {
@@ -502,7 +517,7 @@ export function useTimeTracking(
           }).catch(err => console.error('[AutoPause] Resume-Fehler:', err))
           mobileNotificationService.showImmediateReminder(
             '⏸️ Pause automatisch beendet',
-            `Deine ${stableSettings.maxPauseMinutes}-Minuten-Pause wurde automatisch beendet.`
+            `Deine ${settings.maxPauseMinutes}-Minuten-Pause wurde automatisch beendet.`
           ).catch(() => {})
         }
       }
@@ -517,7 +532,7 @@ export function useTimeTracking(
     return () => {
       document.removeEventListener('visibilitychange', onVisChange)
     }
-  }, [stableSettings.autoPauseEnd, stableSettings.maxPauseMinutes])
+  }, []) // KEINE Dependencies — liest alles über Refs
 
   // Cleanup beim Unmount
   useEffect(() => {
